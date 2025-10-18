@@ -25,6 +25,8 @@ temp_files/
 
 **/*.mp4 
 
+
+
 # ------------------------------------
 # 3. Operating System / IDE Files
 # ------------------------------------
@@ -39,3 +41,4 @@ temp_files/
 # 4. Miscellaneous
 # ------------------------------------
 prompt.txt
+contents/*.json

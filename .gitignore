@@ -1,0 +1,41 @@
+# ------------------------------------
+# 1. Environment and Python Build Files
+# ------------------------------------
+# Ignore virtual environment directory
+venv/
+
+# Byte-compiled Python files
+__pycache__/
+*.pyc
+
+# Distribution/build artifacts
+*.egg-info/
+dist/
+build/
+
+# ------------------------------------
+# 2. Output, Temporary, and Large Media Files
+# ------------------------------------
+# Ignore all automatically generated video outputs
+reels/
+
+# Ignore all temporary processing files
+temp/
+temp_files/
+
+**/*.mp4 
+
+# ------------------------------------
+# 3. Operating System / IDE Files
+# ------------------------------------
+# macOS files
+.DS_Store
+
+# Common IDE files (VS Code, PyCharm)
+.idea/
+.vscode/
+
+# ------------------------------------
+# 4. Miscellaneous
+# ------------------------------------
+prompt.txt

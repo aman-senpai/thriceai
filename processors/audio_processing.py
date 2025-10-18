@@ -21,11 +21,9 @@ from config import (
 @contextlib.contextmanager
 def suppress_output():
     """Context manager to suppress stdout and stderr. Defined here for multiprocessing safety."""
-    # We use io.StringIO() and sys.stdout/stderr redirection
     with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
         yield
 
-# -------------------------------------------------------------------
 
 
 def load_input_json(filepath):
@@ -44,7 +42,6 @@ def load_input_json(filepath):
             
         language_code = data.get("languageCode", "en")
 
-        print(f"Loaded JSON input in {time.time() - start_time:.2f}s")
         return ordered_turns, language_code 
         
     except FileNotFoundError:
@@ -75,7 +72,6 @@ def process_single_turn(turn_data, language_code, turn_index):
         # 1. Generate Custom Audio using macOS 'say'
         escaped_text = text.replace('"', '\\"') 
         command = f'echo "{escaped_text}" | say -v "{role_voice}" -o {temp_aiff_path} -f -'
-        # Note: os.system runs synchronously here
         os.system(command)
         
         if not os.path.exists(temp_aiff_path) or os.path.getsize(temp_aiff_path) == 0:
@@ -85,16 +81,16 @@ def process_single_turn(turn_data, language_code, turn_index):
         with suppress_output():
             audio = whisper.load_audio(temp_aiff_path) 
         
-        # Load model inside here for starmap compatibility, but note performance impact
-        model = whisper.load_model("base", device="cpu") 
-        
-        result = whisper.transcribe(
-            model, 
-            audio, 
-            language=language_code, 
-            compute_word_confidence=False,
-            verbose=False 
-        )
+            # Load model and transcribe inside the context manager
+            model = whisper.load_model("base", device="cpu") 
+            
+            result = whisper.transcribe(
+                model, 
+                audio, 
+                language=language_code, 
+                compute_word_confidence=False,
+                verbose=False 
+            )
         
         whisper_word_data_raw = []
         for segment in result.get('segments', []):
@@ -129,9 +125,9 @@ def generate_multi_role_audio_multiprocess(ordered_turns, language_code):
 
     max_processes_limit = 8
     num_processes = min(os.cpu_count() or 1, max_processes_limit, len(tasks)) 
-    print(f"Starting audio generation with {num_processes} parallel processes...")
-
+    
     with Pool(processes=num_processes) as pool:
+        # Progress bars often originate from the starmap execution if logging isn't suppressed.
         all_results = pool.starmap(process_single_turn, tasks)
 
     valid_results = sorted([r for r in all_results if r is not None], key=lambda x: x[0])
@@ -143,9 +139,7 @@ def generate_multi_role_audio_multiprocess(ordered_turns, language_code):
     all_word_data = []
     audio_clips = []
     current_offset = 0.0
-    
-    print("Concatenating audio and adjusting timestamps...")
-    
+        
     for _, duration, whisper_word_data_raw, temp_aiff_path in valid_results:
         
         word_data_list = whisper_word_data_raw 
@@ -174,13 +168,11 @@ def generate_multi_role_audio_multiprocess(ordered_turns, language_code):
         else:
             scale_factor = 1.0
 
-        print(f"Applying time scale factor of {scale_factor:.4f} (Audio: {true_duration:.2f}s, Whisper: {whisper_total_time:.2f}s)")
+        # Removed: print(f"Applying time scale factor...")
         
         for word_data in all_word_data:
             word_data['start'] *= scale_factor
             word_data['end'] *= scale_factor
-
-    print(f"Multi-Role TTS + Timestamps (Multiprocessing) completed in {time.time() - total_start_time:.2f}s")
             
     return final_audio_clip, all_word_data
 

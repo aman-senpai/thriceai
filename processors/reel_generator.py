@@ -5,6 +5,7 @@ import time
 import shutil
 import random
 import numpy as np
+import glob
 from moviepy.editor import (
     VideoFileClip,
     TextClip,
@@ -12,7 +13,7 @@ from moviepy.editor import (
 )
 
 from config import (
-    INPUT_DIR, VIDEO_FILE, OUTPUT_DIR, TEMP_DIR, OUTPUT_FILE, 
+    INPUT_DIR, VIDEO_DIR, OUTPUT_DIR, TEMP_DIR, OUTPUT_FILE, # CHANGED: Renamed VIDEO_FILE to VIDEO_DIR
     TARGET_W, TARGET_H, FONT, FONT_SIZE, TEXT_COLOR, STROKE_COLOR, 
     STROKE_WIDTH, CAPTION_POSITION, BOUNCE_SCALE_MAX, MIN_CLIP_DURATION,
     suppress_output
@@ -35,7 +36,23 @@ class ReelGenerator:
         self.final_reel_name = f"{self.base_name}.mp4"
         self.final_output_path = os.path.join(OUTPUT_DIR, self.final_reel_name)
         self.temp_output_file = OUTPUT_FILE
+        self.video_file = self._get_random_video_file() # NEW: Select a random video upon initialization
+    
+    # NEW: Method to select a random video file
+    def _get_random_video_file(self):
+        """Selects a random video file from the configured video directory."""
+        # Search for common video extensions
+        video_extensions = ['*.mp4', '*.mov', '*.avi', '*.mkv'] 
+        all_videos = []
+        for ext in video_extensions:
+            all_videos.extend(glob.glob(os.path.join(VIDEO_DIR, ext)))
+
+        if not all_videos:
+            raise FileNotFoundError(f"No video files found in the directory: {VIDEO_DIR}")
         
+        # Select one random video file
+        return random.choice(all_videos)
+
     def _apply_bounce_animation(self, clip, word_duration):
         """Optimized bounce animation for a single word clip."""
         duration = max(word_duration, MIN_CLIP_DURATION) 
@@ -60,7 +77,7 @@ class ReelGenerator:
 
     def _create_text_clips(self, word_data_list):
         """Create animated text clips for all words."""
-        start_time = time.time()
+        # start_time = time.time() # REMOVED: Intermediate timing start
         text_clips = []
         
         if not word_data_list:
@@ -92,15 +109,17 @@ class ReelGenerator:
             
             text_clips.append(animated_txt)
         
-        print(f"Text clips created in {time.time() - start_time:.2f}s")
         return text_clips
 
     def _prepare_video(self, required_duration):
         """Loads, loops/subclips, resizes, and crops the background video."""
-        video_start = time.time()
+        # video_start = time.time() # REMOVED: Intermediate timing start
+        
+        # CHANGED: Use the randomly selected video file
+        print(f"  Using background video: {os.path.basename(self.video_file)}") 
         
         with suppress_output():
-            video = VideoFileClip(VIDEO_FILE)
+            video = VideoFileClip(self.video_file)
         
             if video.duration < required_duration:
                 # Loop the video if it's shorter than the audio
@@ -117,7 +136,6 @@ class ReelGenerator:
             x_start = (video_w - TARGET_W) / 2
             final_video_clip = final_video_clip.crop(x1=x_start, width=TARGET_W)
         
-        print(f"Video preparation completed in {time.time() - video_start:.2f}s")
         return final_video_clip
 
     def create_reel(self):
@@ -134,7 +152,7 @@ class ReelGenerator:
             if not ordered_turns:
                 return
 
-            # 2. Generate Custom Audio and get Word Timestamps
+            # 2. Generate Custom Audio and get Word Timestamps (Audio processing prints are now removed from audio_processing.py)
             tts_audio_clip, word_data_list = generate_multi_role_audio_multiprocess(
                 ordered_turns, language_code
             )
@@ -153,15 +171,11 @@ class ReelGenerator:
             if not text_clips:
                 print("Video generation failed: No text clips were created. Check caption data.")
                 return
-
-            # 6. Final Composition and Export
-            print("Compositing final video...")
             
             final_clip = CompositeVideoClip([final_video_clip] + text_clips, size=(TARGET_W, TARGET_H))
             final_clip = final_clip.set_audio(tts_audio_clip)
 
             export_start = time.time()
-            print(f"Exporting to {self.temp_output_file}...")
             
             with suppress_output():
                 final_clip.write_videofile(
@@ -172,21 +186,19 @@ class ReelGenerator:
                     temp_audiofile=os.path.join(TEMP_DIR, 'temp-audio.m4a'),
                     remove_temp=True,
                     threads=6,
-                    preset='fast' 
+                    preset='fast',
+                    logger=None
                 )
-            print(f"Export completed in {time.time() - export_start:.2f}s")
             
             # 7. Move to Final Location
             shutil.move(self.temp_output_file, self.final_output_path)
-            print(f"\n✅ Successfully created Instagram Reel in {time.time() - total_start_time:.2f}s: {self.final_output_path}")
+            # KEEP FINAL SUCCESS MESSAGE
+            print(f"Total time: {time.time() - total_start_time:.2f}s")
 
+        except FileNotFoundError as e: # NEW: Catch FileNotFoundError specifically for videos
+            print(f"\nAn error occurred: {e}")
         except Exception as e:
             print(f"\nAn error occurred during video generation for {self.input_json_path}: {e}")
         
         finally:
-            # Cleanup all temporary files and the directory
-            cleanup_start = time.time()
-            if os.path.exists(TEMP_DIR):
-                shutil.rmtree(TEMP_DIR)
-                 
-            print(f"Cleanup completed in {time.time() - cleanup_start:.2f}s")
+            pass

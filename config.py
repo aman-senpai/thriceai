@@ -6,9 +6,9 @@ import contextlib
 
 # --- DIRECTORY CONFIGURATION ---
 INPUT_DIR = "contents" 
-VIDEO_FILE = "assets/minecraft.mp4" 
+VIDEO_DIR = "assets/bg_videos"
 OUTPUT_DIR = "reels" 
-TEMP_DIR = "temp_files"
+TEMP_DIR = "temp"
 
 # Temporary files for processing
 TEMP_AIFF_PATH = os.path.join(TEMP_DIR, "temp_tts_audio_turn_{}.aiff") 

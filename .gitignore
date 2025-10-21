@@ -14,14 +14,8 @@ __pycache__/
 dist/
 build/
 
-# ------------------------------------
-# 2. Output, Temporary, and Large Media Files
-# ------------------------------------
-# Ignore all automatically generated video outputs
-reels/
 
 # Ignore all temporary processing files
-temp/
 temp_files/
 
 **/*.mp4 

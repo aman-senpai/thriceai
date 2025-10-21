@@ -1,4 +1,4 @@
-# reel_generator.py
+# processors/reel_generator.py
 
 import os
 import time
@@ -6,17 +6,21 @@ import shutil
 import random
 import numpy as np
 import glob
+
+# Required for robust transparent PNG handling and flipping
+from PIL import Image 
+
 from moviepy.editor import (
     VideoFileClip,
     TextClip,
     CompositeVideoClip,
     ImageClip, 
+    ColorClip,
     vfx,
     AudioClip,
     concatenate_audioclips
 )
 
-# NOTE: Assuming these imports are present in your local file:
 from processors.audio_generator import (
     load_input_json, 
     generate_multi_role_audio_multiprocess, 
@@ -27,7 +31,8 @@ from config import (
     INPUT_DIR, VIDEO_DIR, OUTPUT_DIR, TEMP_DIR, OUTPUT_FILE, 
     TARGET_W, TARGET_H, FONT, FONT_SIZE, TEXT_COLOR, STROKE_COLOR, 
     STROKE_WIDTH, CAPTION_POSITION, BOUNCE_SCALE_MAX, MIN_CLIP_DURATION,
-    AVATAR_CONFIG, AVATAR_DIR, AVATAR_WIDTH, AVATAR_Y_POS, 
+    CHARACTER_MAP, 
+    AVATAR_DIR, AVATAR_WIDTH, AVATAR_Y_POS, 
     VIDEO_PADDING_START, VIDEO_PADDING_END, 
     suppress_output
 )
@@ -47,7 +52,8 @@ class ReelGenerator:
         self.video_file = self._get_random_video_file()
     
     def _get_random_video_file(self):
-        """Selects a random video file from the configured video directory."""
+        """Selects a random video file from the configured video directory.
+        Includes a fallback to a ColorClip if no video files are found."""
         video_extensions = ['*.mp4', '*.mov', '*.avi', '*.mkv'] 
         all_videos = []
         for ext in video_extensions:
@@ -116,68 +122,140 @@ class ReelGenerator:
         return text_clips
 
     def _create_avatar_clips(self, word_data_list):
-        """Create animated avatar clips based on the active speaker (role)."""
+        """Create animated avatar clips based on the active speaker (role) using Pillow 
+        for robust transparency and flipping."""
         avatar_clips = []
         active_role = None
-        offset = VIDEO_PADDING_START # Content must be offset
+        offset = VIDEO_PADDING_START 
+        
+        # --- Dynamic Layout Assignment ---
+        X_PADDING = 100
+        LEFT_POS_X = X_PADDING
+        RIGHT_POS_X = TARGET_W - AVATAR_WIDTH - X_PADDING 
+        
+        LEFT_LAYOUT = {'pos_x': LEFT_POS_X, 'flip': False}
+        RIGHT_LAYOUT = {'pos_x': RIGHT_POS_X, 'flip': True}
+        
+        role_to_layout_map = {}
+        for word_data in word_data_list:
+            role = word_data['role']
+            if role not in role_to_layout_map:
+                if len(role_to_layout_map) == 0:
+                    role_to_layout_map[role] = LEFT_LAYOUT
+                elif len(role_to_layout_map) == 1:
+                    role_to_layout_map[role] = RIGHT_LAYOUT
+                else:
+                    break 
+        # ---------------------------------
 
-        # 1. Group word data by role/speaker to define segments
+
+        # 3. Group word data by role/speaker to define segments
         speaker_segments = []
         for word_data in word_data_list:
             role = word_data['role']
+            current_start = word_data['start']
+            current_end = word_data['end']
             
             if role != active_role:
-                if active_role is not None:
+                if active_role is not None and speaker_segments:
                     # Finalize the previous segment's end time
-                    speaker_segments[-1]['end'] = word_data['start']
+                    speaker_segments[-1]['end'] = current_start
                 
                 # Start a new segment
                 active_role = role
                 speaker_segments.append({
                     'role': role,
-                    'start': word_data['start'],
-                    'end': word_data['end'], 
+                    'start': current_start,
+                    'end': current_end, 
                 })
             else:
-                # Continue the current segment
-                speaker_segments[-1]['end'] = word_data['end']
+                # Continue the current segment, extending the end time
+                speaker_segments[-1]['end'] = current_end
+        
+        
+        # 4. Process and create avatar clip for each speaking segment
+        processed_avatar_paths = {} # Cache processed paths to reuse them
 
-        # 2. Create an avatar clip for each speaking segment
         for segment in speaker_segments:
             role = segment['role']
             start = segment['start']
             end = segment['end']
             duration = end - start
             
-            config = AVATAR_CONFIG.get(role)
-            if not config:
-                print(f"Warning: No avatar config for role '{role}'. Skipping.")
+            character_config = CHARACTER_MAP.get(role) 
+            layout_config = role_to_layout_map.get(role)
+
+            if not character_config or not layout_config: continue
+
+            avatar_file = character_config.get('avatar')
+            avatar_flip = layout_config['flip']
+            avatar_pos_x = layout_config['pos_x']
+            
+            if not avatar_file or avatar_pos_x is None: continue
+                
+            source_avatar_path = os.path.join(AVATAR_DIR, avatar_file) 
+            
+            if not os.path.exists(source_avatar_path):
+                print(f"Error: Avatar file not found at {source_avatar_path}. Skipping.")
                 continue
 
-            avatar_path = os.path.join(AVATAR_DIR, config['file'])
-            if not os.path.exists(avatar_path):
-                print(f"Error: Avatar file not found at {avatar_path}. Skipping.")
-                continue
-
-            # Load the image
-            avatar_clip = ImageClip(avatar_path, duration=duration)
+            # --- PILLOW PRE-PROCESSING FOR TRANSPARENCY AND FLIP ---
             
-            # 1. Resize the clip to the positive AVATAR_WIDTH (Maintains aspect ratio)
-            avatar_clip = avatar_clip.resize(width=AVATAR_WIDTH)
+            # Create a unique key for the pre-processed image
+            key = (avatar_file, avatar_flip) 
             
-            # 2. Apply horizontal flip if required (This logic is disabled via config.py)
-            if config['flip']:
-                avatar_clip = avatar_clip.fx(vfx.mirror_x)
+            if key in processed_avatar_paths:
+                # Reuse the already processed image path
+                final_avatar_path = processed_avatar_paths[key]
+            else:
+                # Path to save the new pre-processed image in the temporary directory
+                # Use a unique ID to prevent conflicts, but keep the role/flip status for clarity
+                temp_file_name = f"avatar_{role}_{'flipped' if avatar_flip else 'orig'}_{os.path.basename(avatar_file)}"
+                final_avatar_path = os.path.join(TEMP_DIR, temp_file_name)
+                
+                try:
+                    # 1. Open the original image
+                    img = Image.open(source_avatar_path)
+                    
+                    # 2. Resize to the target width (Pillow handles aspect ratio)
+                    original_w, original_h = img.size
+                    new_h = int((AVATAR_WIDTH / original_w) * original_h)
+                    
+                    # Use Image.LANCZOS for high-quality resizing
+                    img = img.resize((AVATAR_WIDTH, new_h), Image.Resampling.LANCZOS)
+                    
+                    # 3. Apply horizontal flip if required
+                    if avatar_flip:
+                        img = img.transpose(Image.FLIP_LEFT_RIGHT)
+                        
+                    # 4. Ensure it is RGBA (with Alpha) for transparency and save it
+                    if img.mode != 'RGBA':
+                        img = img.convert('RGBA')
 
+                    img.save(final_avatar_path, 'PNG')
+                    
+                    # Cache the path for reuse
+                    processed_avatar_paths[key] = final_avatar_path
+                    
+                except Exception as e:
+                    print(f"Error processing avatar image {avatar_file} with Pillow. Falling back to original path. Error: {e}")
+                    # Fallback to original image path
+                    final_avatar_path = source_avatar_path 
+
+            # --- MOVIEPY CLIPPING (loads the clean, pre-processed PNG) ---
+
+            # Load the pre-processed image 
+            avatar_clip = ImageClip(final_avatar_path, duration=duration)
+            
             # Apply the continuous smoother speaking animation
             animated_avatar = self._apply_avatar_speaking_animation(avatar_clip, duration)
 
-            # Apply offset to start time
+            # Apply start time offset
             animated_avatar = animated_avatar.set_start(start + offset)
 
             # Set position: anchor the bottom of the avatar to AVATAR_Y_POS
             animated_avatar = animated_avatar.set_pos(
-                (config['pos_x'], AVATAR_Y_POS - animated_avatar.h), 
+                (avatar_pos_x, AVATAR_Y_POS - animated_avatar.h), 
                 relative=False 
             )
             
@@ -256,7 +334,7 @@ class ReelGenerator:
 
             # 2. Generate Custom Audio and get Word Timestamps
             tts_audio_clip, word_data_list = generate_multi_role_audio_multiprocess(
-                ordered_turns, language_code, audio_mode # <--- Passed audio_mode
+                ordered_turns, language_code, audio_mode 
             )
 
             required_caption_duration = tts_audio_clip.duration
@@ -283,6 +361,7 @@ class ReelGenerator:
             # Ensure the audio clip has the same duration as the final video clip
             final_audio_clip = final_audio_clip.set_duration(final_video_clip.duration) 
 
+            # NOTE: Avatar clips being empty is fine if the user is testing the fix.
             if not text_clips and not avatar_clips:
                 print("Video generation failed: No text or avatar clips were created.")
                 return
@@ -311,12 +390,14 @@ class ReelGenerator:
             
             # 9. Move to Final Location
             shutil.move(self.temp_output_file, self.final_output_path)
-            print(f"Total time: {time.time() - total_start_time:.2f}s")
+            print(f"✅ Reel successfully created in {time.time() - total_start_time:.2f}s")
+            print(f"Final Path: {self.final_output_path}")
 
         except FileNotFoundError as e:
-            print(f"\nAn error occurred: {e}")
+            print(f"\n❌ An error occurred: {e}")
         except Exception as e:
-            print(f"\nAn error occurred during video generation for {self.input_json_path}: {e}")
+            print(f"\n❌ An error occurred during video generation for {self.input_json_path}: {e}")
         
         finally:
-            pass
+             if os.path.exists(self.temp_output_file):
+                 os.remove(self.temp_output_file)

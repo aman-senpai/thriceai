@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  # Backend Service (FastAPI)
+  backend:
+    build:
+      context: ./  # Path to the directory containing backend/Dockerfile
+    container_name: faceless_backend
+    ports:
+      - "6969:6969"
+    # Load environment variables from backend/.env at runtime
+    env_file:
+      - ./.env 
+    # Use a shared network so frontend can talk to backend
+    networks:
+      - faceless_network
+    restart: always
+
+  # Frontend Service (Next.js)
+  frontend:
+    build:
+      context: ./web_app # Path to the directory containing frontend/Dockerfile
+    container_name: faceless_frontend
+    ports:
+      - "3000:3000"
+    networks:
+      - faceless_network
+    depends_on:
+      - backend # Ensures backend starts before the frontend tries to connect
+    restart: always
+
+networks:
+  faceless_network:
+    driver: bridge

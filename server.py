@@ -1,4 +1,4 @@
-# server.py
+# server.py - Pure Backend API
 import os
 import shutil
 import glob
@@ -6,21 +6,26 @@ import sys
 import uvicorn
 import json
 from fastapi import FastAPI, Request, Form, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel
 from typing import List, Dict, Any
+from fastapi.middleware.cors import CORSMiddleware
 import time
+
+# --- UTILITY AND BUSINESS LOGIC IMPORTS ---
 
 # Ensure these imports are correct for your project structure
 try:
-    from config import INPUT_DIR, PROMPTS_DIR, CHARACTER_MAP, TEMP_DIR, VIDEO_DIR
+    # Assuming config.py now includes CAPTION_DIR
+    from config import INPUT_DIR, PROMPTS_DIR, CHARACTER_MAP, TEMP_DIR, VIDEO_DIR, OUTPUT_DIR, CAPTION_DIR
     from services.content_writer import generate_content
+    # NEW IMPORT: The function is now in the services folder
+    from services.caption_generator import generate_caption 
     from processors.reel_generator import ReelGenerator 
 except ImportError as e:
     print(f"Error importing modules (Check config.py, services/, processors/): {e}")
     sys.exit(1)
+
 
 # --- UTILITIES ---
 
@@ -42,8 +47,8 @@ def get_prompt_files():
 
 def _process_reels(files_to_process_paths: List[str], audio_mode: str):
     """Handles the core reel generation using ReelGenerator."""
-    if not os.path.isdir(VIDEO_DIR):
-        raise HTTPException(status_code=500, detail=f"Error: Video directory '{VIDEO_DIR}' not found.")
+    if not os.path.isdir(OUTPUT_DIR): 
+        raise HTTPException(status_code=500, detail=f"Error: Video directory '{OUTPUT_DIR}' not found.")
         
     try:
         os.makedirs(TEMP_DIR, exist_ok=True)
@@ -56,7 +61,6 @@ def _process_reels(files_to_process_paths: List[str], audio_mode: str):
         json_file = os.path.basename(input_path)
         print(f"[{i}/{len(files_to_process_paths)}] Processing: {json_file}")
         try:
-            # Assumes ReelGenerator is correctly imported and functions
             generator = ReelGenerator(input_path)
             generator.create_reel(audio_mode) 
             results.append({"file": json_file, "status": "Success"})
@@ -66,21 +70,13 @@ def _process_reels(files_to_process_paths: List[str], audio_mode: str):
             
     return results
 
+from fastapi.staticfiles import StaticFiles
+
 # --- FastAPI Setup ---
-app = FastAPI(title="Faceless Reel Generator WebUI")
-templates = Jinja2Templates(directory="web_interface")
+app = FastAPI(title="Faceless Reel Generator API")
 
-# Mount static files (JS, CSS)
-app.mount("/static", StaticFiles(directory="web_interface/static"), name="static")
-
-# Mount the assets directory (for character images/avatars)
-# IMPORTANT: This assumes your images are in a folder named 'assets'
-if os.path.isdir("assets"):
-    # Note: We must ensure this mount is after the one above, or use a distinct name.
-    # We will use the explicit /assets prefix to avoid conflict with root-served files.
-    app.mount("/assets", StaticFiles(directory="assets"), name="assets")
-else:
-    print("Warning: 'assets' directory not found. Character images may not load.")
+app.mount("/reels", StaticFiles(directory=OUTPUT_DIR), name="reels")
+app.mount("/contents", StaticFiles(directory=INPUT_DIR), name="contents")
 
 # --- Schemas and Global State ---
 
@@ -97,16 +93,7 @@ class ContentFile(BaseModel):
 
 current_session_files: List[ContentFile] = []
 
-# --- Endpoints ---
-
-@app.get("/", response_class=HTMLResponse)
-async def home(request: Request):
-    """Serves the main web interface page."""
-    # The frontend script.js will fetch all dynamic data via API
-    return templates.TemplateResponse(
-        "index.html",
-        {"request": request}
-    )
+# --- API Endpoints (Pure Backend) ---
 
 @app.get("/api/data/config")
 async def get_config_data_api():
@@ -121,7 +108,7 @@ async def get_config_data_api():
 @app.get("/api/data/reels")
 async def get_reels_api():
     """Returns a list of all finished reel files with creation time."""
-    reel_files = glob.glob(os.path.join(VIDEO_DIR, "*.mp4"))
+    reel_files = glob.glob(os.path.join(OUTPUT_DIR, "*.mp4")) 
     
     reels_list = []
     for f_path in reel_files:
@@ -133,7 +120,7 @@ async def get_reels_api():
                 "name": os.path.basename(f_path),
                 "path": f_path,
                 "size_kb": round(os.path.getsize(f_path) / 1024, 2),
-                "modified": os.path.getmtime(f_path) * 1000, # Convert to milliseconds
+                "modified": os.path.getmtime(f_path) * 1000,
                 "content_exists": os.path.exists(content_path)
             })
         except Exception:
@@ -160,32 +147,22 @@ async def get_contents_api():
             with open(f_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             
-            # *** UPDATED LOGIC ***
-            # Try 'conversation' format (like glutes.json)
-            dialogue_list = data.get('conversation', [])
-            if dialogue_list:
-                for item in dialogue_list:
-                    if item.get('role') and item.get('text'):
-                        dialogues.append({
-                            "speaker": item['role'],
-                            "dialogue": item['text']
-                        })
-            else:
-                # Fallback to 'content' format (original code)
-                dialogue_list = data.get('content', [])
-                for item in dialogue_list:
-                    if item.get('speaker') and item.get('dialogue'):
-                        dialogues.append({
-                            "speaker": item['speaker'],
-                            "dialogue": item['dialogue']
-                        })
-            # *** END OF UPDATE ***
+            # Extract dialogues from 'conversation' or 'content' keys
+            dialogue_list = data.get('conversation', data.get('content', []))
+            for item in dialogue_list:
+                speaker = item.get('role') or item.get('speaker')
+                text = item.get('text') or item.get('dialogue')
+                if speaker and text:
+                    dialogues.append({
+                        "speaker": speaker,
+                        "dialogue": text
+                    })
             
             contents_list.append({
                 "name": os.path.basename(f_path),
                 "path": f_path,
                 "modified": os.path.getmtime(f_path) * 1000,
-                "query": data.get('query', data.get('topic', 'N/A')), # Also check for 'topic'
+                "query": data.get('query', data.get('topic', 'N/A')), 
                 "dialogues": dialogues
             })
         except Exception as e:
@@ -199,34 +176,38 @@ async def get_contents_api():
             
     return {"contents": contents_list}
 
-@app.get("/api/download/reel/{filename}")
-async def download_reel(filename: str):
-    """Allows downloading a finished reel file."""
-    file_path = os.path.join(VIDEO_DIR, filename)
+
+@app.get("/api/data/reels/{filename}") 
+async def get_reel_file(filename: str):
+    """Allows downloading or streaming a finished reel file."""
+    file_path = os.path.join(OUTPUT_DIR, filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Reel file not found.")
     
+    # NOTE: The Next.js frontend might need to stream this file directly
     return FileResponse(
         path=file_path, 
-        filename=filename, 
-        media_type='video/mp4'
+        media_type='video/mp4' 
     )
 
-@app.get("/api/preview/reel/{filename}")
-async def preview_reel(filename: str):
-    """Allows streaming/previewing a finished reel file."""
-    file_path = os.path.join(VIDEO_DIR, filename)
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="Reel file not found.")
-    
-    return FileResponse(
-        path=file_path, 
-        media_type='video/mp4'
-    )
 
 @app.post("/api/generate-content")
-async def generate_content_api(data: GenerateContentRequest):
+async def generate_content_api(
+    query: str = Form(...),
+    file_name: str = Form(...),
+    selected_prompt_path: str = Form(...),
+    char_a_name: str = Form(...),
+    char_b_name: str = Form(...)
+):
     """API endpoint to trigger content generation."""
+    
+    data = GenerateContentRequest(
+        query=query,
+        file_name=file_name,
+        selected_prompt_path=selected_prompt_path,
+        char_a_name=char_a_name,
+        char_b_name=char_b_name
+    )
     
     if data.char_a_name == data.char_b_name:
         raise HTTPException(status_code=400, detail="Character A and Character B must be different.")
@@ -238,7 +219,6 @@ async def generate_content_api(data: GenerateContentRequest):
     expected_path = os.path.join(INPUT_DIR, file_name_clean)
 
     try:
-        # Assumes generate_content is correctly imported
         if generate_content(
             data.query, 
             file_name_clean, 
@@ -255,6 +235,35 @@ async def generate_content_api(data: GenerateContentRequest):
     except Exception as e:
         print(f"Error during content generation: {e}")
         raise HTTPException(status_code=500, detail=f"Server error during generation: {e}")
+
+
+@app.post("/api/generate-caption/{filename}")
+async def generate_caption_api(filename: str):
+    """
+    API endpoint to generate an Instagram caption for a finished content JSON file.
+    The filename must be the name of the JSON content file (e.g., 'glutes.json').
+    """
+    
+    if not filename.endswith(".json"):
+        filename += ".json"
+        
+    script_file_path = os.path.join(INPUT_DIR, filename)
+
+    if not os.path.exists(script_file_path):
+        raise HTTPException(status_code=404, detail=f"Content file not found at {script_file_path}")
+
+    try:
+        caption_text = generate_caption(script_file_path)
+        
+        if caption_text: 
+            return {"message": "Caption generated and saved successfully", "caption": caption_text}
+        else:
+            raise HTTPException(status_code=500, detail="Caption generation failed due to an internal error or API failure. Check server logs.")
+            
+    except Exception as e:
+        print(f"Error calling generate_caption: {e}")
+        raise HTTPException(status_code=500, detail=f"Server error during caption generation: {e}")
+
 
 @app.post("/api/generate-reels/session")
 async def generate_session_reels_api(audio_mode: str = Form(...)):
@@ -290,7 +299,8 @@ async def startup_event():
     # Ensure necessary directories exist
     os.makedirs(INPUT_DIR, exist_ok=True)
     os.makedirs(PROMPTS_DIR, exist_ok=True)
-    os.makedirs(VIDEO_DIR, exist_ok=True)
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    os.makedirs(CAPTION_DIR, exist_ok=True)
     print("Application startup: Directories confirmed.")
 
 @app.on_event("shutdown")
@@ -300,8 +310,17 @@ async def shutdown_event():
 
 # --- Execution Block (for main.py to call) ---
 def run_server():
-    """Function to start the Uvicorn server."""
-    # This block is essential for main.py to invoke the server
+    """Function to start the Uvicorn server with CORS configured."""
+    
+    # Configure CORS for Next.js frontend integration
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],  # Be specific in production: e.g., ["http://localhost:3000"]
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
 if __name__ == "__main__":

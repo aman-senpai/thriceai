@@ -6,6 +6,14 @@ import contextlib
 import json 
 import sys
 
+# --- NEW FOLLOW ANIMATION CONFIGURATION ---
+FOLLOW_ANIMATION_PATH = "assets/follow_animation/follow animation.webp"
+FOLLOW_TRIGGER_WORD = "follow" # The word that triggers the animation
+ANIMATION_DURATION = 1.0       # Duration (in seconds) the animation should play for
+ANIMATION_Y_POS = 100          # Y position for the animation on screen
+ANIMATION_SCALE = 0.5          # Scale factor for the animation
+# -----------------------------------------
+
 # --- API KEY NAME ---
 ELEVEN_API_KEY_NAME = "ELEVEN_API" 
 GEMINI_API_KEY_NAME = "GEMINI_API_KEY" 
@@ -31,6 +39,8 @@ OUTPUT_DIR = "reels"
 TEMP_DIR = "temp"
 PROMPTS_DIR = "prompts"
 CHARACTER_CONFIG_FILE = "characters.json"
+CAPTION_DIR = "contents/captions"
+CAPTION_SYSTEM_PROMPT_PATH = "prompts/captions/blinked_thrice.txt"
 
 # Temporary files for processing
 TEMP_AIFF_PATH = os.path.join(TEMP_DIR, "temp_tts_audio_turn_{}.aiff") 

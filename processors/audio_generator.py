@@ -7,7 +7,7 @@ import numpy as np
 import sys
 import contextlib
 import io
-from multiprocessing import Pool
+from multiprocessing import Pool # Still imported, but conditionally used
 from moviepy.editor import AudioFileClip, concatenate_audioclips
 import whisper_timestamped as whisper 
 import re 
@@ -178,24 +178,35 @@ def _generate_audio_for_turn(turn_index, turn, tts_mode):
 
 def generate_multi_role_audio_multiprocess(ordered_turns: list, language_code: str, tts_mode: str):
     """
-    Generates audio and word data for all turns using multiprocessing.
+    Generates audio and word data for all turns using multiprocessing or sequential
+    processing based on the TTS mode.
     """
     print(f"\nSelected TTS Mode: {tts_mode.upper()} TTS")
     
-    # Determine the number of processes using the centralized configuration
-    num_processes = TTS_PROCESS_CONFIG.get(tts_mode, DEFAULT_TTS_PROCESSES)
-    
-    # Fallback/cap: Use the minimum of the configured value and the CPU count
-    # and ensure it's at least 1.
-    num_processes = max(1, min(num_processes, os.cpu_count() or 1))
-    
-    print(f"Using {num_processes} parallel process(es) for {tts_mode.upper()} TTS audio generation.")
-    
     tasks = [(i, turn, tts_mode) for i, turn in enumerate(ordered_turns)]
     
-    # Use Pool to execute the generation tasks
-    with Pool(processes=num_processes) as pool:
-        results = pool.starmap(_generate_audio_for_turn, tasks)
+    # --- FIX: Use sequential processing for Gemini TTS to prevent multiprocessing issues ---
+    if tts_mode == 'gemini':
+        print("Using sequential processing for GEMINI TTS.")
+        results = []
+        for task in tasks:
+            # Unpack task tuple: (turn_index, turn, tts_mode)
+            result = _generate_audio_for_turn(*task) 
+            results.append(result)
+    else:
+        # Determine the number of processes using the centralized configuration
+        num_processes = TTS_PROCESS_CONFIG.get(tts_mode, DEFAULT_TTS_PROCESSES)
+        
+        # Fallback/cap: Use the minimum of the configured value and the CPU count
+        # and ensure it's at least 1.
+        num_processes = max(1, min(num_processes, os.cpu_count() or 1))
+        
+        print(f"Using {num_processes} parallel process(es) for {tts_mode.upper()} TTS audio generation.")
+        
+        # Use Pool to execute the generation tasks for parallel processing
+        with Pool(processes=num_processes) as pool:
+            results = pool.starmap(_generate_audio_for_turn, tasks)
+    # ------------------------------------------------------------------------------------------
 
     
     # Aggregate results

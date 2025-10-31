@@ -1,0 +1,31 @@
+# ------------------------------------
+# Sensitive/Configuration Files
+# ------------------------------------
+.env                 # Exclude your local environment variables file (most important for security)
+.git                 # Git version control directory
+.gitignore           # Git ignore list
+.vscode              # VS Code settings (or other IDE settings)
+
+# ------------------------------------
+# Python Specific Files/Directories
+# ------------------------------------
+__pycache__/         # Python compiled bytecode cache
+*.pyc                # Compiled Python files
+*.log                # Log files
+
+# ------------------------------------
+# Build/Temporary Directories
+# ------------------------------------
+venv/                # Local Python virtual environment directory
+env/                 # Another common virtual environment name
+dist/                # Distribution archives
+build/               # Build artifacts
+*.egg-info/          # Python package metadata
+
+# ------------------------------------
+# Docker Specific Files (Optional but good practice)
+# ------------------------------------
+Dockerfile           # The file itself is not needed inside the image
+.dockerignore        # The file itself is not needed inside the image
+
+*.mp4

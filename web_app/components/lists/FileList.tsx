@@ -1,20 +1,19 @@
-// src/components/lists/FileList.tsx
 import React from 'react';
-import { ReelItem, ContentItem } from '../../types'; // Adjust path
-import { cardClasses } from '../../lib/constants'; // Adjust path
+import { ReelItem, ContentItem } from '../../types';
+import { cardClasses } from '../../lib/constants';
 
 interface FileListProps {
     title: string;
     data: ReelItem[] | ContentItem[];
     isLoading: boolean;
     isContentList: boolean;
-    showPreviewModal?: (url: string) => void; // Changed to accept URL
+    showPreviewModal?: (url: string) => void;
     showDialogueModal?: (item: ContentItem) => void;
     handleCaptionGeneration?: (contentFileName: string) => Promise<void>;
     isContentGenerating: boolean;
     isReelGenerating: boolean;
     refreshLists: () => Promise<void>;
-    apiBaseUrl: string; // New prop
+    apiBaseUrl: string;
 }
 
 const formatTimestamp = (ms: number) => {
@@ -29,9 +28,7 @@ export const FileList: React.FC<FileListProps> = ({
 }) => {
     const isGenerating = isContentGenerating || isReelGenerating;
 
-    // Helper function to remove the file extension
     const removeExtension = (fileName: string) => {
-        // Regex to match the last dot followed by characters (the extension)
         return fileName.replace(/\.[^/.]+$/, "");
     }
 
@@ -55,7 +52,6 @@ export const FileList: React.FC<FileListProps> = ({
                     data.map((item, index) => (
                         <div key={index} className="flex justify-between items-center p-4 rounded-xl bg-dark-bg hover:bg-dark-bg/80 border border-dark-border/70 transition duration-150 shadow-md">
                             <div className="truncate pr-4">
-                                {/* APPLY removeExtension HERE */}
                                 <p className="font-semibold text-gray-200">{removeExtension(item.name)}</p>
                                 <p className="text-xs text-gray-400 mt-1">
                                     {isContentList ? `Query: ${(item as ContentItem).query}` : `${(item as ReelItem).size_kb.toFixed(1)} KB`}
@@ -66,7 +62,6 @@ export const FileList: React.FC<FileListProps> = ({
                             <div className="flex space-x-2 flex-shrink-0">
                                 {isContentList ? (
                                     <>
-                                        {/* Generate Caption Button */}
                                         <button
                                             onClick={() => handleCaptionGeneration?.(item.name)}
                                             className="p-3 rounded-full text-warning-yellow hover:bg-dark-border transition shadow-sm"
@@ -75,7 +70,6 @@ export const FileList: React.FC<FileListProps> = ({
                                         >
                                             <i className="fas fa-closed-captioning"></i>
                                         </button>
-                                        {/* Edit Button */}
                                         <button
                                             onClick={() => showDialogueModal?.(item as ContentItem)}
                                             className="p-3 rounded-full text-primary-blue hover:bg-dark-border transition shadow-sm"
@@ -87,7 +81,6 @@ export const FileList: React.FC<FileListProps> = ({
                                     </>
                                 ) : (
                                     <>
-                                        {/* Download Button (FIXED URL) */}
                                         <a
                                             href={`${apiBaseUrl}/reels/${item.name}`}
                                             download
@@ -96,7 +89,6 @@ export const FileList: React.FC<FileListProps> = ({
                                         >
                                             <i className="fas fa-download"></i>
                                         </a>
-                                        {/* Preview Button (FIXED onClick handler) */}
                                         <button
                                             onClick={() => showPreviewModal?.(`${apiBaseUrl}/reels/${item.name}`)}
                                             className="p-3 rounded-full text-primary-blue hover:bg-dark-border transition shadow-sm"

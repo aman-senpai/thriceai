@@ -2,16 +2,13 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { FileList } from "@/components/lists/FileList";
-// Import the new modular component and its types
 import VideoModals, { VideoModalsProps } from "@/components/modals/VideoModals";
 
-// --- Design Constants derived from the provided HTML/Tailwind config ---
-// NOTE: These variables replicate the HTML styles for consistency.
 const cardClasses = "bg-dark-card p-6 rounded-2xl shadow-xl border border-dark-border/50";
 const selectOrInputClasses = "w-full p-3 rounded-lg bg-dark-bg border border-dark-border focus:ring-primary-blue focus:border-primary-blue transition text-gray-200";
 const primaryButtonClasses = "w-full py-3 bg-primary-blue text-white font-bold rounded-lg hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.01]";
 const successButtonClasses = "w-full py-3 bg-success-green text-white font-bold rounded-lg hover:bg-green-600 transition disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.01]";
-const dangerButtonClasses = "py-2 px-4 bg-danger-red text-white font-bold rounded-lg hover:bg-red-600 transition disabled:opacity-50 disabled:cursor-not-allowed"; // Kept for consistency
+const dangerButtonClasses = "py-2 px-4 bg-danger-red text-white font-bold rounded-lg hover:bg-red-600 transition disabled:opacity-50 disabled:cursor-not-allowed";
 
 // --- 1. Type Definitions (Preserved and Exported) ---
 interface CharacterDetails {
@@ -62,6 +59,208 @@ const sanitizeFileName = (name: string) => name.replace(/[^a-zA-Z0-9_]/g, '').to
 const API_BASE_URL = typeof window === 'undefined' 
   ? 'http://localhost:8000' 
   : `http://${window.location.hostname}:8000`;
+
+// --- Reusable UI Components ---
+
+const BaseButton = ({ children, onClick, disabled, className = "" }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean; className?: string }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    className={`px-4 py-2 font-semibold rounded-lg transition duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+  >
+    {children}
+  </button>
+);
+
+const GenerateButton = ({ children, onClick, disabled, className, isSubmit=false }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean; className?: string, isSubmit?: boolean }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    type={isSubmit ? "submit" : "button"}
+    className={`${primaryButtonClasses} ${className}`}
+  >
+    {children}
+  </button>
+);
+
+interface HeaderProps {
+  refreshLists: () => void;
+  isReelGenerating: boolean;
+  isContentGenerating: boolean;
+  isReelsLoading: boolean;
+  isContentsLoading: boolean;
+}
+
+const Header = ({ refreshLists, isReelGenerating, isContentGenerating, isReelsLoading, isContentsLoading }: HeaderProps) => (
+    <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b-2 border-primary-blue/30 pb-4 mb-8">
+        <h1 className="text-3xl font-extrabold text-primary-blue">
+            <i className="fas fa-film mr-3"></i> Reel Generator
+        </h1>
+        <div className="mt-4 sm:mt-0 flex items-center space-x-3">
+            <button
+                onClick={refreshLists}
+                disabled={isReelGenerating || isContentGenerating}
+                className="p-3 rounded-full bg-dark-card hover:bg-dark-border transition text-gray-400 hover:text-primary-blue"
+                title="Refresh Lists"
+            >
+                <i className={`fas fa-sync text-lg ${isReelsLoading || isContentsLoading ? "animate-spin" : ""}`}></i>
+            </button>
+        </div>
+    </header>
+);
+
+interface GenerateContentFormProps {
+  config: ConfigData | null;
+  charA: string; setCharA: React.Dispatch<React.SetStateAction<string>>;
+  charB: string; setCharB: React.Dispatch<React.SetStateAction<string>>;
+  audioMode: string; setAudioMode: React.Dispatch<React.SetStateAction<string>>;
+  promptPath: string; setPromptPath: React.Dispatch<React.SetStateAction<string>>;
+  query: string; 
+  handleQueryChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  fileName: string; 
+  handleFileNameChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  contentStatus: string;
+  isConfigLoading: boolean;
+  isContentGenerating: boolean;
+  isConfigValid: boolean;
+  handleContentGeneration: (e: React.FormEvent) => Promise<void>;
+}
+
+const GenerateContentForm = React.memo(function GenerateContentForm({
+  config,
+  charA, setCharA,
+  charB, setCharB,
+  audioMode, setAudioMode,
+  promptPath, setPromptPath,
+  query, 
+  handleQueryChange,
+  fileName, 
+  handleFileNameChange,
+  contentStatus,
+  isConfigLoading,
+  isContentGenerating,
+  isConfigValid,
+  handleContentGeneration,
+}: GenerateContentFormProps) {
+  
+  const handleCharAChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => setCharA(e.target.value), [setCharA]);
+  const handleCharBChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => setCharB(e.target.value), [setCharB]);
+  const handleAudioModeChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => setAudioMode(e.target.value), [setAudioMode]);
+  const handlePromptPathChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => setPromptPath(e.target.value), [setPromptPath]);
+
+  return (
+      <div id="config-section" className={cardClasses}>
+          <h2 className="text-2xl font-bold mb-6 text-primary-blue"><i className="fas fa-solid fa-feather"></i> Generate Dialogue Content</h2>
+          <form onSubmit={handleContentGeneration} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                      <label className="block text-sm font-medium mb-1">Character A</label>
+                      <select value={charA} onChange={handleCharAChange} className={selectOrInputClasses} disabled={isConfigLoading || isContentGenerating} id="char_a_name">
+                          {config && Object.entries(config.characters).map(([key, obj]) => (
+                              <option key={key} value={key}>{`${key.toUpperCase()} — ${obj.voice_gemini || obj.voice_eleven || obj.voice_mac || 'N/A'}`}</option>
+                          ))}
+                      </select>
+                  </div>
+                  <div>
+                      <label className="block text-sm font-medium mb-1">Character B</label>
+                      <select value={charB} onChange={handleCharBChange} className={selectOrInputClasses} disabled={isConfigLoading || isContentGenerating} id="char_b_name">
+                          {config && Object.entries(config.characters).map(([key, obj]) => (
+                              <option key={key} value={key}>{`${key.toUpperCase()} — ${obj.voice_gemini || obj.voice_eleven || obj.voice_mac || 'N/A'}`}</option>
+                          ))}
+                      </select>
+                      {charA === charB && charA && <p className="text-danger-red text-xs mt-1">Characters must be different.</p>}
+                  </div>
+              </div>
+              <div>
+                  <label className="block text-sm font-medium mb-1">Audio Mode</label>
+                  <select value={audioMode} onChange={handleAudioModeChange} className={selectOrInputClasses} disabled={isConfigLoading || isContentGenerating} id="audio_mode">
+                       {config && Object.entries(config.audio_modes).map(([key, name]) => (<option key={key} value={key}>{name}</option>))}
+                  </select>
+              </div>
+              <div>
+                  <label className="block text-sm font-medium mb-1">Prompt Template</label>
+                  <select value={promptPath} onChange={handlePromptPathChange} className={selectOrInputClasses} disabled={isConfigLoading || isContentGenerating} id="selected_prompt_path">
+                      {config && Object.entries(config.prompts).map(([path, name]) => (<option key={path} value={path}>{name}</option>))}
+                  </select>
+              </div>
+              <div>
+                  <label className="block text-sm font-medium mb-1">Query/Topic for Content</label>
+                  <input type="text" value={query} onChange={handleQueryChange} maxLength={config?.max_query_length || 200} placeholder="e.g., 'A funny debate about pineapples on pizza'" className={selectOrInputClasses} disabled={isConfigLoading || isContentGenerating} id="query_input" />
+              </div>
+              <div>
+                  <label className="block text-sm font-medium mb-1">Output Filename (e.g., debate_pizza)</label>
+                  <input type="text" value={fileName} onChange={handleFileNameChange} placeholder="file_name (omit extension)" className={selectOrInputClasses} disabled={isConfigLoading || isContentGenerating} id="file_name_input" />
+                  {fileName && sanitizeFileName(fileName) !== fileName.toLowerCase() && (
+                      <p className="text-warning-yellow text-xs mt-1">Filename will be sanitized to: <strong>{sanitizeFileName(fileName)}</strong></p>
+                  )}
+              </div>
+              <GenerateButton onClick={() => {}} disabled={!isConfigValid || isContentGenerating || isConfigLoading} isSubmit={true} className="flex justify-center items-center">
+                  {isContentGenerating ? (<><i className="fas fa-spinner fa-spin mr-2"></i> Generating...</>) : (<span id="generate-content-btn">Generate Content</span>)}
+              </GenerateButton>
+              <p id="content-status" className="mt-4 text-sm text-center text-gray-400">{contentStatus}</p>
+          </form>
+      </div>
+  );
+});
+
+interface ReelGenerationSectionProps {
+  handleSessionReelGeneration: () => void;
+  handleAllReelGeneration: () => void;
+  isReelGenerating: boolean;
+  sessionCount: number;
+  audioMode: string;
+  reelStatus: string;
+  config: ConfigData | null;
+}
+
+const ReelGenerationSection = ({ handleSessionReelGeneration, handleAllReelGeneration, isReelGenerating, sessionCount, audioMode, reelStatus, config }: ReelGenerationSectionProps) => (
+    <div className={cardClasses}>
+        <h2 className="text-2xl font-bold mb-6 text-primary-blue"><i className="fas fa-regular fa-video"></i> Generate Video Reels</h2>
+        <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+            <GenerateButton onClick={handleSessionReelGeneration} disabled={isReelGenerating || sessionCount <= 0 || !audioMode} className="flex-1">
+                {isReelGenerating && sessionCount > 0 ? <i className="fas fa-spinner fa-spin mr-2"></i> : null}
+                <span id="generate-session-reels-btn">Generate Session Reels (<span id="session-count">{sessionCount}</span>)</span>
+            </GenerateButton>
+            <GenerateButton onClick={handleAllReelGeneration} disabled={isReelGenerating || !audioMode} className={`flex-1 ${successButtonClasses}`}>
+                {isReelGenerating && sessionCount === 0 ? <i className="fas fa-spinner fa-spin mr-2"></i> : null}
+                <span id="generate-all-reels-btn">Generate ALL Reels</span>
+            </GenerateButton>
+        </div>
+        <p id="reel-status" className="mt-4 text-sm text-center text-gray-400">
+            {reelStatus || `Remaining files in current session: ${sessionCount}. Selected audio mode: ${config?.audio_modes[audioMode] || 'None'}`}
+        </p>
+    </div>
+);
+
+const logColorClasses: Record<LogType, string> = {
+  info: "text-primary-blue",
+  error: "text-danger-red",
+  warn: "text-warning-yellow",
+  success: "text-success-green",
+};
+
+interface LogSectionProps {
+  logMessages: LogMessage[];
+  refreshLists: () => void;
+}
+
+const LogSection = ({ logMessages, refreshLists }: LogSectionProps) => (
+    <div className={cardClasses}>
+        <h2 className="text-2xl font-bold mb-4 text-primary-blue flex justify-between items-center">
+            <i className="fas fa-solid fa-terminal"></i>
+            <button onClick={refreshLists} id="refresh-all-btn" className="text-gray-400 hover:text-primary-blue transition">
+                 <i className="fas fa-sync"></i>
+            </button>
+        </h2>
+        <pre id="log-output" className="h-64 overflow-y-auto font-mono text-sm bg-dark-bg/50 p-3 rounded-lg border border-dark-border custom-scrollbar">
+            {logMessages.map((log, idx) => (
+                <div key={idx} className={`${logColorClasses[log.type]} whitespace-pre-wrap`}>
+                    <span className="text-gray-500">[{log.timestamp}]</span> {log.message}
+                </div>
+            ))}
+        </pre>
+    </div>
+);
 
 // --- 4. Main Component ---
 export default function Page() {
@@ -169,16 +368,13 @@ export default function Page() {
     [charA, charB, audioMode, promptPath, query, fileName]
   );
   
-  // --- FIX: Stable handlers for query and filename inputs defined here ---
   const handleQueryChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setQuery(e.target.value);
-  }, [setQuery]);
+  }, []);
 
   const handleFileNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setFileName(e.target.value); 
-  }, [setFileName]);
-  // ----------------------------------------------------------------------
-
+  }, []);
 
   // --- Handlers ---
   const handleContentGeneration = useCallback(async (e: React.FormEvent) => {
@@ -190,7 +386,6 @@ export default function Page() {
     log("Generating content...", "info");
 
     try {
-      // Use the helper to sanitize before API call
       const sanitizedFileName = sanitizeFileName(fileName); 
 
       const payload = { 
@@ -214,7 +409,7 @@ export default function Page() {
     } finally {
       setIsContentGenerating(false);
     }
-  }, [charA, charB, promptPath, query, fileName, log, isConfigValid, refreshLists, setQuery, setFileName]); // Dependencies are important
+  }, [charA, charB, promptPath, query, fileName, log, isConfigValid, refreshLists]);
 
   const handleSessionReelGeneration = async () => {
     const endpoint = "/api/generate-reels/session";
@@ -258,7 +453,6 @@ export default function Page() {
       setIsReelGenerating(false);
     }
   };
-
 
   const handleSaveDialogue = async () => {
     if (!dialogueFileName || isDialogueSaving) return;
@@ -321,9 +515,7 @@ export default function Page() {
 
   const showDialogueModal = (item: ContentItem) => {
     setDialogueFileName(item.name);
-
     const formattedDialogue = item.dialogues.map(d => `${d.speaker.toUpperCase()}: ${d.dialogue}`).join('\n\n');
-
     const content = `// Content Query: ${item.query}\n// File Path: ${item.path}\n// ----------------------------------\n\n${formattedDialogue}`;
     setDialogueContent(content);
     setIsDialogueModalOpen(true);
@@ -340,295 +532,11 @@ export default function Page() {
     setCaptionContent('');
     setCaptionFileName('');
   }
-
-  // --- UI Components (Restored) ---
-
-  const logColorClasses: Record<LogType, string> = {
-    info: "text-primary-blue",
-    error: "text-danger-red",
-    warn: "text-warning-yellow",
-    success: "text-success-green",
-  };
-
-  const BaseButton = ({ children, onClick, disabled, className = "" }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean; className?: string }) => (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`px-4 py-2 font-semibold rounded-lg transition duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
-    >
-      {children}
-    </button>
-  );
-
-  const GenerateButton = ({ children, onClick, disabled, className, isSubmit=false }: { children: React.ReactNode; onClick?: () => void; disabled: boolean; className?: string, isSubmit?: boolean }) => (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      type={isSubmit ? "submit" : "button"}
-      className={primaryButtonClasses + " " + className}
-    >
-      {children}
-    </button>
-  );
-
-
-  const Header = () => (
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b-2 border-primary-blue/30 pb-4 mb-8">
-          <h1 className="text-3xl font-extrabold text-primary-blue">
-              <i className="fas fa-film mr-3"></i> Reel Generator
-          </h1>
-          <div className="mt-4 sm:mt-0 flex items-center space-x-3">
-              <button
-                  onClick={refreshLists}
-                  disabled={isReelGenerating || isContentGenerating}
-                  className="p-3 rounded-full bg-dark-card hover:bg-dark-border transition text-gray-400 hover:text-primary-blue"
-                  title="Refresh Lists"
-              >
-                  <i className={`fas fa-sync text-lg ${isReelsLoading || isContentsLoading ? "animate-spin" : ""}`}></i>
-              </button>
-          </div>
-      </header>
-  );
-
-  // 🚨 NEW MEMOIZED COMPONENT FOR THE FORM
-  // Updated props interface to accept stable handlers
-  interface GenerateContentFormProps {
-    config: ConfigData | null;
-    charA: string; setCharA: React.Dispatch<React.SetStateAction<string>>;
-    charB: string; setCharB: React.Dispatch<React.SetStateAction<string>>;
-    audioMode: string; setAudioMode: React.Dispatch<React.SetStateAction<string>>;
-    promptPath: string; setPromptPath: React.Dispatch<React.SetStateAction<string>>;
-    query: string; 
-    handleQueryChange: (e: React.ChangeEvent<HTMLInputElement>) => void; // Stable prop
-    fileName: string; 
-    handleFileNameChange: (e: React.ChangeEvent<HTMLInputElement>) => void; // Stable prop
-    contentStatus: string;
-    isConfigLoading: boolean;
-    isContentGenerating: boolean;
-    isConfigValid: boolean;
-    handleContentGeneration: (e: React.FormEvent) => Promise<void>;
-  }
-
-  const GenerateContentForm = React.memo(function GenerateContentForm({
-    config,
-    charA, setCharA,
-    charB, setCharB,
-    audioMode, setAudioMode,
-    promptPath, setPromptPath,
-    query, 
-    handleQueryChange, // Stable prop
-    fileName, 
-    handleFileNameChange, // Stable prop
-    contentStatus,
-    isConfigLoading,
-    isContentGenerating,
-    isConfigValid,
-    handleContentGeneration,
-  }: GenerateContentFormProps) {
-    
-    // Character, Audio, Prompt changes still use useCallback here,
-    // as their setters (setCharA, setCharB, etc.) are stable props.
-
-    const handleCharAChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-        setCharA(e.target.value);
-    }, [setCharA]);
-
-    const handleCharBChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-        setCharB(e.target.value);
-    }, [setCharB]);
-
-    const handleAudioModeChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-        setAudioMode(e.target.value);
-    }, [setAudioMode]);
-
-    const handlePromptPathChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-        setPromptPath(e.target.value);
-    }, [setPromptPath]);
-
-    // handleQueryChange and handleFileNameChange are now passed as stable props.
-    // They no longer need to be wrapped in useCallback here.
-
-    return (
-        <div id="config-section" className={cardClasses}>
-            <h2 className="text-2xl font-bold mb-6 text-primary-blue"><i className="fas fa-solid fa-feather"></i> Generate Dialogue Content</h2>
-            <form onSubmit={handleContentGeneration} className="space-y-4">
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium mb-1">Character A</label>
-                        <select
-                            value={charA}
-                            onChange={handleCharAChange}
-                            className={selectOrInputClasses}
-                            disabled={isConfigLoading || isContentGenerating}
-                            id="char_a_name"
-                        >
-                            {config && Object.entries(config.characters).map(([key, obj]) => (
-                                <option key={key} value={key}>
-                                    {`${key.toUpperCase()} — ${obj.voice_gemini || obj.voice_eleven || obj.voice_mac || 'N/A'}`}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium mb-1">Character B</label>
-                        <select
-                            value={charB}
-                            onChange={handleCharBChange}
-                            className={selectOrInputClasses}
-                            disabled={isConfigLoading || isContentGenerating}
-                            id="char_b_name"
-                        >
-                            {config && Object.entries(config.characters).map(([key, obj]) => (
-                                <option key={key} value={key}>
-                                    {`${key.toUpperCase()} — ${obj.voice_gemini || obj.voice_eleven || obj.voice_mac || 'N/A'}`}
-                                </option>
-                            ))}
-                        </select>
-                        {charA === charB && charA && <p className="text-danger-red text-xs mt-1">Characters must be different.</p>}
-                    </div>
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium mb-1">Audio Mode</label>
-                    <select
-                        value={audioMode}
-                        onChange={handleAudioModeChange}
-                        className={selectOrInputClasses}
-                        disabled={isConfigLoading || isContentGenerating}
-                        id="audio_mode"
-                    >
-                         {config && Object.entries(config.audio_modes).map(([key, name]) => (
-                            <option key={key} value={key}>{name}</option>
-                        ))}
-                    </select>
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium mb-1">Prompt Template</label>
-                    <select
-                        value={promptPath}
-                        onChange={handlePromptPathChange}
-                        className={selectOrInputClasses}
-                        disabled={isConfigLoading || isContentGenerating}
-                        id="selected_prompt_path"
-                    >
-                        {config && Object.entries(config.prompts).map(([path, name]) => (
-                            <option key={path} value={path}>{name}</option>
-                        ))}
-                    </select>
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium mb-1">Query/Topic for Content</label>
-                    <input
-                        type="text"
-                        value={query}
-                        onChange={handleQueryChange} // FIX: Use stable prop handler
-                        maxLength={config?.max_query_length || 200}
-                        placeholder="e.g., 'A funny debate about pineapples on pizza'"
-                        className={selectOrInputClasses}
-                        disabled={isConfigLoading || isContentGenerating}
-                        id="query_input"
-                    />
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium mb-1">Output Filename (e.g., debate_pizza)</label>
-                    <input
-                        type="text"
-                        value={fileName}
-                        onChange={handleFileNameChange} // FIX: Use stable prop handler
-                        placeholder="file_name (omit extension)"
-                        className={selectOrInputClasses}
-                        disabled={isConfigLoading || isContentGenerating}
-                        id="file_name_input"
-                    />
-                    {/* Display a hint about sanitization rules */}
-                    {fileName && sanitizeFileName(fileName) !== fileName.toLowerCase() && (
-                        <p className="text-warning-yellow text-xs mt-1">
-                            Filename will be sanitized to: **{sanitizeFileName(fileName)}**
-                        </p>
-                    )}
-                </div>
-
-                <GenerateButton
-                    onClick={() => {}}
-                    disabled={!isConfigValid || isContentGenerating || isConfigLoading}
-                    isSubmit={true}
-                    className="flex justify-center items-center"
-                >
-                    {isContentGenerating ? (
-                        <>
-                            <i className="fas fa-spinner fa-spin mr-2"></i> Generating...
-                        </>
-                    ) : (
-                        <span id="generate-content-btn">Generate Content</span>
-                    )}
-                </GenerateButton>
-                <p id="content-status" className="mt-4 text-sm text-center text-gray-400">{contentStatus}</p>
-            </form>
-        </div>
-    );
-  });
-  // 🚨 END NEW MEMOIZED COMPONENT
-
-
-  const ReelGenerationSection = () => (
-      <div className={cardClasses}>
-        
-          <h2 className="text-2xl font-bold mb-6 text-primary-blue"><i className="fas fa-regular fa-video"></i> Generate Video Reels</h2>
-          <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-              <GenerateButton
-                  onClick={handleSessionReelGeneration}
-                  disabled={isReelGenerating || sessionCount <= 0 || !audioMode}
-                  className="flex-1"
-              >
-                  {isReelGenerating && sessionCount > 0 ? <i className="fas fa-spinner fa-spin mr-2"></i> : null}
-                  <span id="generate-session-reels-btn">Generate Session Reels (<span id="session-count">{sessionCount}</span>)</span>
-              </GenerateButton>
-              <GenerateButton
-                  onClick={handleAllReelGeneration}
-                  disabled={isReelGenerating || !audioMode}
-                  className={`flex-1 ${successButtonClasses}`}
-              >
-                  {isReelGenerating && sessionCount === 0 ? <i className="fas fa-spinner fa-spin mr-2"></i> : null}
-                  <span id="generate-all-reels-btn">Generate ALL Reels</span>
-              </GenerateButton>
-          </div>
-          <p id="reel-status" className="mt-4 text-sm text-center text-gray-400">
-              {reelStatus || `Remaining files in current session: ${sessionCount}. Selected audio mode: ${config?.audio_modes[audioMode] || 'None'}`}
-          </p>
-      </div>
-  );
-
-  const LogSection = () => (
-      <div className={cardClasses}>
-          <h2 className="text-2xl font-bold mb-4 text-primary-blue flex justify-between items-center">
-              <i className="fas fa-solid fa-terminal"></i>
-              <button onClick={refreshLists} id="refresh-all-btn" className="text-gray-400 hover:text-primary-blue transition">
-                   <i className="fas fa-sync"></i>
-              </button>
-          </h2>
-          <pre id="log-output" className="h-64 overflow-y-auto font-mono text-sm bg-dark-bg/50 p-3 rounded-lg border border-dark-border custom-scrollbar">
-              {logMessages.map((log, idx) => (
-                  <div key={idx} className={`${logColorClasses[log.type]} whitespace-pre-wrap`}>
-                      <span className="text-gray-500">[{log.timestamp}]</span> {log.message}
-                  </div>
-              ))}
-          </pre>
-      </div>
-  );
-
   
-  // --- Create Props Object for VideoModals ---
   const videoModalsProps: VideoModalsProps = {
-    // Preview
     isPreviewModalOpen,
     previewUrl,
     hidePreviewModal,
-
-    // Dialogue Editor
     isDialogueModalOpen,
     dialogueFileName,
     dialogueContent,
@@ -636,27 +544,29 @@ export default function Page() {
     hideDialogueModal,
     handleSaveDialogue,
     isDialogueSaving,
-
-    // Caption
     isCaptionModalOpen,
     captionFileName,
     captionContent,
     hideCaptionModal,
-    log, // Pass the logging function
+    log,
   };
 
-  // --- Main Layout ---
   if (!mounted) return null;
 
   return (
       <div className="transition-colors duration-600 bg-gray-950 text-green-200 min-h-screen"> 
           <div className="max-w-7xl mx-auto p-4 md:p-10">
-              <Header />
+              <Header 
+                refreshLists={refreshLists}
+                isReelGenerating={isReelGenerating}
+                isContentGenerating={isContentGenerating}
+                isReelsLoading={isReelsLoading}
+                isContentsLoading={isContentsLoading}
+              />
 
               <main className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
                   <section className="lg:col-span-2 space-y-8">
-                      {/* 🚨 Use the memoized form component here */}
                       <GenerateContentForm 
                           config={config}
                           charA={charA} setCharA={setCharA}
@@ -664,21 +574,31 @@ export default function Page() {
                           audioMode={audioMode} setAudioMode={setAudioMode}
                           promptPath={promptPath} setPromptPath={setPromptPath}
                           query={query} 
-                          handleQueryChange={handleQueryChange} // FIX: Pass stable handler
+                          handleQueryChange={handleQueryChange}
                           fileName={fileName} 
-                          handleFileNameChange={handleFileNameChange} // FIX: Pass stable handler
+                          handleFileNameChange={handleFileNameChange}
                           contentStatus={contentStatus}
                           isConfigLoading={isConfigLoading}
                           isContentGenerating={isContentGenerating}
                           isConfigValid={isConfigValid}
                           handleContentGeneration={handleContentGeneration}
                       />
-                      <ReelGenerationSection />
-                      <LogSection />
+                      <ReelGenerationSection 
+                        handleSessionReelGeneration={handleSessionReelGeneration}
+                        handleAllReelGeneration={handleAllReelGeneration}
+                        isReelGenerating={isReelGenerating}
+                        sessionCount={sessionCount}
+                        audioMode={audioMode}
+                        reelStatus={reelStatus}
+                        config={config}
+                      />
+                      <LogSection 
+                        logMessages={logMessages}
+                        refreshLists={refreshLists}
+                      />
                   </section>
 
                   <section className="lg:col-span-1 space-y-8">
-
                       <FileList
                           title="Generated Reels"
                           data={reels}
@@ -688,7 +608,6 @@ export default function Page() {
                           apiBaseUrl={API_BASE_URL}
                           refreshLists={refreshLists}
                       />
-
                       <FileList
                           title="Generated Content"
                           data={contents}
@@ -699,12 +618,10 @@ export default function Page() {
                           apiBaseUrl={API_BASE_URL}
                           refreshLists={refreshLists}
                       />
-
                   </section>
               </main>
           </div>
 
-          {/* Modals: Now using the modular component */}
           <VideoModals {...videoModalsProps} />
       </div>
   );

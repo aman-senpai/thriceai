@@ -1,111 +1,136 @@
-
 # Faceless Reel Automation Project
 
-This Python project automates the creation of vertical (9:16) short-form video content (like Instagram Reels or TikToks) from simple **JSON conversation scripts**. It synchronizes custom **text-to-speech (TTS) audio** with animated captions over a dynamically selected background video.
+![Project Banner](misc/image.png)
 
-The project leverages **multiprocessing** for fast audio generation and **Whisper** for precise word-level timestamping.
+This project is a full-stack application designed to automate the creation of vertical (9:16) short-form videos, like Instagram Reels or TikToks. It features a web-based interface to generate content from scripts, convert text-to-speech (TTS) with multiple voice options, and combine it with animated captions over a background video.
+
+The application is containerized with Docker for easy setup and deployment, and includes a Python backend powered by FastAPI and a Next.js frontend.
 
 ---
 
 ## Features
 
-* **Random Background Selection:** Automatically selects a random source video from the `contents/bg_videos` directory for a unique look every time.
-* **Multi-Role TTS:** Uses macOS native `say` command with custom voices (e.g., `Aman`, `Isha`) for multi-role dialogue.
-* **Precise Caption Sync:** Utilizes `whisper-timestamped` to get millisecond-accurate timing for word boundaries.
-* **Animated Captions:** Captions feature a subtle, bouncy animation synchronized with speech.
-* **Automatic Video Formatting:** Crops and resizes a source video to the 9:16 vertical standard (1080x1920) and loops/subclips it to match the audio duration.
-* **Modular OOP Design:** Code is organized into reusable modules for easy maintenance and scaling.
+*   **Web Interface:** A user-friendly UI built with Next.js to manage content, characters, and video generation.
+*   **Multiple TTS Providers:** Supports various text-to-speech services, including Google's Gemini, ElevenLabs, and macOS's native `say` command.
+*   **Dockerized Environment:** Comes with a `docker-compose.yml` for a one-command setup of both the frontend and backend services.
+*   **Customizable Characters:** Define characters with unique voices and avatars through a simple `characters.json` file.
+*   **Dynamic Content Generation:** Use prompts to generate dialogue scripts for your videos.
+*   **Precise Caption Sync:** Utilizes `whisper-timestamped` for millisecond-accurate, word-level synchronization of captions.
+*   **Animated Captions:** Captions feature a subtle bounce animation synchronized with the audio.
+*   **Telegram Bot Integration:** A simple bot to retrieve the local IP address for easy access to the web UI on your network.
 
 ---
 
-## 🛠️ Prerequisites
+## Tech Stack
 
-This project is primarily designed to run on **macOS** because it relies on the native `say` command for high-quality, zero-latency Text-to-Speech audio generation.
-
-1.  **Python 3.12**
-2.  **macOS** (for the `say` command)
-3.  **Required Libraries:**
-    ```bash
-    pip install -r requirements.txt
-    # Key dependencies include: moviepy, numpy, whisper-timestamped
-    ```
-4.  **FFmpeg:** MoviePy requires FFmpeg to be installed on your system.
-    ```bash
-    # Install via Homebrew
-    brew install ffmpeg
-    ```
+*   **Backend:** Python, FastAPI, MoviePy, Whisper
+*   **Frontend:** Next.js, React, Tailwind CSS
+*   **Services:** Docker, FFmpeg
 
 ---
 
 ## 🚀 Getting Started
 
-### Project Structure
+### Prerequisites
 
-````
+*   [Git](https://git-scm.com/)
+*   [Docker](https://www.docker.com/get-started) and [Docker Compose](https://docs.docker.com/compose/install/)
+*   [Node.js](https://nodejs.org/) (for local development)
+*   [Python 3.10+](https://www.python.org/) (for local development)
+*   [FFmpeg](https://ffmpeg.org/download.html) (for local development)
 
-.
-├── assets/
-├── contents/  
-│   ├── bg\_videos/
-│   └── scripts/
-├── main.py
-├── processors/
-├── reels/
-└── temp/
-````
+### Docker Setup (Recommended)
 
-### 1. Configuration & Input
-
-1.  **Background Videos:** Place all your desired source videos (e.g., looping gameplay) into the new `contents/bg_videos/` directory. The script will pick one **randomly** for each video generated.
-2.  **Fonts:** Ensure your desired font is in the `assets/` directory and specified in `config.py`.
-3.  **Conversation JSON:** Create a conversation script in the `contents/scripts/` directory (e.g., `dsa.json`) following this format:
-
-    ```json
-    {
-      "languageCode": "en",
-      "conversation": [
-        {"role": "Aman", "text": "Dialogue for the first speaker."},
-        {"role": "Isha", "text": "Dialogue for the second speaker."},
-        ...
-      ]
-    }
+1.  **Clone the repository:**
+    ```bash
+    git clone <repository-url>
+    cd faceless_project
     ```
 
-### 2. Execution
+2.  **Create a `.env` file:**
+    Create a `.env` file in the root of the project and add your API keys:
+    ```env
+    ELEVEN_API="your_elevenlabs_api_key"
+    GEMINI_API_KEY="your_gemini_api_key"
+    TELEGRAM_BOT="your_telegram_bot_token"
+    ```
 
-Run the main script from the project root:
+3.  **Build and run with Docker Compose:**
+    ```bash
+    docker-compose up --build
+    ```
+    The web interface will be available at [http://localhost:3000](http://localhost:3000).
 
-```bash
-python3 main.py
-````
+### Local Development
 
-The script will automatically process all `.json` files found in the `contents/scripts/` directory, generating a corresponding video in the `reels/` directory.
+1.  **Backend Setup:**
+    ```bash
+    pip install -r requirements.txt
+    ```
 
------
+2.  **Frontend Setup:**
+    ```bash
+    cd web_app
+    npm install
+    ```
 
-##  Configuration
+3.  **Run the application:**
+    From the root directory, run:
+    ```bash
+    python3 main.py
+    ```
+    This will start the FastAPI backend, the Next.js development server, and the Telegram bot.
 
-All user-facing settings are managed in **`config.py`**.
+---
 
-| Setting | Location | Description |
-| :--- | :--- | :--- |
-| **`BG_VIDEO_DIR`** | `config.py` | Path to the directory containing all background video assets. **(Updated)** |
-| `VOICE_MAP` | `config.py` | Maps roles (e.g., "Aman") to macOS voice names. |
-| `TARGET_W`, `TARGET_H` | `config.py` | Final video resolution (should be 1080x1920). |
-| `FONT`, `FONT_SIZE` | `config.py` | Caption styling options. |
-| `MIN_CLIP_DURATION` | `config.py` | Minimum duration for a single word caption clip (to filter out noise/stutters). |
+## Project Structure
 
------
+```
+.
+├── assets/
+│   ├── avatars/
+│   └── bg_videos/
+├── contents/
+│   └── captions/
+├── processors/
+├── services/
+├── web_app/
+│   ├── app/
+│   └── components/
+├── config.py
+├── characters.json
+├── docker-compose.yml
+├── main.py
+├── server.py
+└── telegram_bot.py
+```
 
-## Architecture
+---
 
-The project follows a modular, object-oriented design:
+## Configuration
 
-  * **`main.py`**: The entry point. It scans the `contents/scripts/` directory and iterates, instantiating the `ReelGenerator` for each file.
-  * **`config.py`**: Holds all global variables, paths, and styling parameters.
-  * **`processors/reel_generator.py`**: Contains the main `ReelGenerator` class, which orchestrates the entire process: **loads a random background video**, loads data, prepares the video, creates text clips, and composites the final file.
-  * **`processors/audio_processing.py`**: Contains the heavy-lifting logic for TTS and timing:
-      * `process_single_turn`: Generates AIFF audio via `say` and transcribes it via `whisper-timestamped` using multiprocessing.
-      * `generate_multi_role_audio_multiprocess`: Concatenates all audio clips and aligns the word timestamps to the total true audio duration.
+*   **`config.py`**: Main configuration file for Python services. Here you can set paths, video styles, and TTS settings.
+*   **`characters.json`**: Define the characters for your videos. Each character can have a name, a voice (mapped to a TTS service), and an avatar.
+*   **`.env`**: For storing API keys and other secrets.
 
-<!-- end list -->
+---
+
+## Usage
+
+### Web Interface
+
+Access the web UI at [http://localhost:3000](http://localhost:3000). From here you can:
+*   Generate new video scripts.
+*   Select characters and a TTS service.
+*   Generate reels from your scripts.
+*   View and download previously generated reels.
+
+### Telegram Bot
+
+The Telegram bot is configured to respond to the command `ip` with the local IP address of the machine running the application. This is useful for accessing the web UI from other devices on the same network.
+
+---
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a pull request.

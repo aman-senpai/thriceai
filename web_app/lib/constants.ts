@@ -37,7 +37,7 @@ export const fetchConfig = async (): Promise<ConfigData> => {
     prompts: Object.fromEntries(
       data.prompt_files.map((p: any) => [p.path, p.name])
     ),
-    max_query_length: 200,
+    max_query_length: 5000,
   };
 };
 

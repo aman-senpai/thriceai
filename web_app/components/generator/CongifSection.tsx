@@ -1,7 +1,7 @@
 // src/components/generator/ConfigSection.tsx
 import React from 'react';
 import { ConfigData } from '@/types';
-import { primaryButtonClasses, selectOrInputClasses, cardClasses, successGreen, dangerRed } from '@/lib/constants'; // Adjust path if using separate types file
+import { primaryButtonClasses, selectOrInputClasses, cardClasses, successGreen, dangerRed } from '@/lib/constants';
 
 interface ConfigSectionProps {
     config: ConfigData | null;
@@ -133,7 +133,7 @@ export const ConfigSection: React.FC<ConfigSectionProps> = ({
                         <input
                             type="text"
                             value={fileName}
-                            onChange={(e) => setFileName(e.target.value.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase())} // Sanitize
+                            onChange={(e) => setFileName(e.target.value.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase())}
                             placeholder="file_name (omit extension)"
                             className={selectOrInputClasses}
                             disabled={isConfigLoading || isContentGenerating}

@@ -5,21 +5,25 @@ import warnings
 import shutil
 import subprocess
 import time
+import signal
 from datetime import datetime, time as dt_time
 import asyncio 
 import multiprocessing 
 
 # --- IMPORTS for .ENV and TELEGRAM BOT ---
 from dotenv import load_dotenv
-from telegram_bot import start_bot
-# --- END IMPORTS ---
+load_dotenv()
 
-# Load environment variables in the parent process
-load_dotenv() 
+# Import logic with fallback for package vs direct execution
+try:
+    from .telegram_bot import start_bot
+    from . import server
+    from .config import TEMP_DIR
+except ImportError:
+    from telegram_bot import start_bot
+    import server
+    from config import TEMP_DIR
 
-# Import the server logic
-import server
-from config import TEMP_DIR
 
 # Suppress resource_tracker warning
 warnings.filterwarnings(
@@ -29,13 +33,13 @@ warnings.filterwarnings(
 )
 
 # --- CONFIGURATION ---
-FRONTEND_DIR = os.path.join(os.path.dirname(__file__), 'web_app')
+FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'web_app'))
+
 FRONTEND_COMMAND = ["npm", "run", "dev"]
 FRONTEND_URL = "http://localhost:3031"
-BACKEND_URL = "http://127.0.0.1:8000"
+BACKEND_URL = "http://127.0.0.1:8008"
 
 # --- TELEGRAM BOT CONFIGURATION ---
-# Time window: 10:00 AM to 3:00 AM (across midnight)
 START_HOUR = 10 
 END_HOUR = 3
 MESSAGE_TEXT = f"🌐 Faceless Reel Generator Web UI is running!\n\nAccess it here: {FRONTEND_URL}"
@@ -43,9 +47,29 @@ MESSAGE_TEXT = f"🌐 Faceless Reel Generator Web UI is running!\n\nAccess it he
 
 # --- UTILITIES ---
 
+def kill_port_processes(ports):
+    """Kills any process running on the specified ports."""
+    for port in ports:
+        try:
+            # Using lsof to find PIDs on the port
+            # -ti returns just the PIDs
+            result = subprocess.check_output(["lsof", "-ti", f":{port}"], stderr=subprocess.DEVNULL)
+            pids = result.decode().strip().split('\n')
+            for pid in pids:
+                if pid:
+                    print(f"⚠️ Port {port} is in use by PID {pid}. Terminating...")
+                    try:
+                        os.kill(int(pid), signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+        except subprocess.CalledProcessError:
+            # No process found on this port, which is good
+            pass
+        except Exception as e:
+            print(f"Error killing process on port {port}: {e}")
+
 def cleanup_temp_dir():
     """Removes temporary directory and contents."""
-    # FIX APPLIED HERE: Use os.path.exists()
     if os.path.exists(TEMP_DIR): 
         try:
             shutil.rmtree(TEMP_DIR)
@@ -78,6 +102,10 @@ def run_web_ui():
     print("🌐 FACELESS REEL GENERATOR: FULL STACK START")
     print("="*50)
     
+    # 0. Kill any existing instances on our ports
+    kill_port_processes([8008, 3031])
+    time.sleep(1) # Wait for ports to clear
+
     # 1. Initial cleanup
     cleanup_temp_dir()
 

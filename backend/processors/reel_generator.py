@@ -24,28 +24,57 @@ from moviepy.editor import (
     ImageSequenceClip, # ADDED: For animated WebP handling
 )
 
-from processors.audio_generator import (
-    load_input_json, 
-    generate_multi_role_audio_multiprocess, 
-    filter_word_data
-)
+try:
+    from .audio_generator import (
+        load_input_json, 
+        generate_multi_role_audio_multiprocess, 
+        filter_word_data
+    )
+    from ..config import (
+        INPUT_DIR, VIDEO_DIR, OUTPUT_DIR, TEMP_DIR, OUTPUT_FILE, 
+        TARGET_W, TARGET_H, FONT, FONT_SIZE, TEXT_COLOR, STROKE_COLOR, 
+        STROKE_WIDTH, CAPTION_POSITION, BOUNCE_SCALE_MAX, MIN_CLIP_DURATION,
+        CHARACTER_MAP, 
+        AVATAR_DIR, AVATAR_WIDTH, AVATAR_Y_POS, 
+        VIDEO_PADDING_START, VIDEO_PADDING_END, 
+        suppress_output,
+        # --- NEW IMPORTS ---
+        FOLLOW_ANIMATION_PATH,
+        FOLLOW_TRIGGER_WORD,
+        ANIMATION_DURATION,
+        ANIMATION_Y_POS,
+        ANIMATION_SCALE,
+        PIP_DIR,
+        PIP_WIDTH,
+        PIP_Y_OFFSET,
+        # -------------------
+    )
+except ImportError:
+    from processors.audio_generator import (
+        load_input_json, 
+        generate_multi_role_audio_multiprocess, 
+        filter_word_data
+    )
+    from config import (
+        INPUT_DIR, VIDEO_DIR, OUTPUT_DIR, TEMP_DIR, OUTPUT_FILE, 
+        TARGET_W, TARGET_H, FONT, FONT_SIZE, TEXT_COLOR, STROKE_COLOR, 
+        STROKE_WIDTH, CAPTION_POSITION, BOUNCE_SCALE_MAX, MIN_CLIP_DURATION,
+        CHARACTER_MAP, 
+        AVATAR_DIR, AVATAR_WIDTH, AVATAR_Y_POS, 
+        VIDEO_PADDING_START, VIDEO_PADDING_END, 
+        suppress_output,
+        # --- NEW IMPORTS ---
+        FOLLOW_ANIMATION_PATH,
+        FOLLOW_TRIGGER_WORD,
+        ANIMATION_DURATION,
+        ANIMATION_Y_POS,
+        ANIMATION_SCALE,
+        PIP_DIR,
+        PIP_WIDTH,
+        PIP_Y_OFFSET,
+        # -------------------
+    )
 
-from config import (
-    INPUT_DIR, VIDEO_DIR, OUTPUT_DIR, TEMP_DIR, OUTPUT_FILE, 
-    TARGET_W, TARGET_H, FONT, FONT_SIZE, TEXT_COLOR, STROKE_COLOR, 
-    STROKE_WIDTH, CAPTION_POSITION, BOUNCE_SCALE_MAX, MIN_CLIP_DURATION,
-    CHARACTER_MAP, 
-    AVATAR_DIR, AVATAR_WIDTH, AVATAR_Y_POS, 
-    VIDEO_PADDING_START, VIDEO_PADDING_END, 
-    suppress_output,
-    # --- NEW IMPORTS ---
-    FOLLOW_ANIMATION_PATH,
-    FOLLOW_TRIGGER_WORD,
-    ANIMATION_DURATION,
-    ANIMATION_Y_POS,
-    ANIMATION_SCALE,
-    # -------------------
-)
 
 
 class ReelGenerator:
@@ -209,12 +238,73 @@ class ReelGenerator:
         return animation_clip
     # ------------------------------------
 
+    def _get_speaker_segments(self, word_data_list):
+        """Groups word data into speaker segments (turns)."""
+        speaker_segments = []
+        active_role = None
+        
+        for word_data in word_data_list:
+            role = word_data['role']
+            current_start = word_data['start']
+            current_end = word_data['end']
+            
+            if role != active_role:
+                if active_role is not None and speaker_segments:
+                    speaker_segments[-1]['end'] = current_start
+                
+                active_role = role
+                speaker_segments.append({
+                    'role': role,
+                    'start': current_start,
+                    'end': current_end, 
+                })
+            else:
+                speaker_segments[-1]['end'] = current_end
+        return speaker_segments
+
+    def _create_pip_asset_clip(self, start_time, end_time):
+        """
+        Creates a PIP (Picture-in-Picture) clip from an uploaded image or video,
+        constrained to the specified start and end times.
+        """
+        if start_time >= end_time:
+            return None
+
+        duration = end_time - start_time
+        assets = glob.glob(os.path.join(PIP_DIR, "*"))
+        if not assets:
+            return None
+            
+        asset_path = assets[0]
+        ext = os.path.splitext(asset_path)[1].lower()
+        
+        try:
+            if ext in ['.mp4', '.mov', '.avi', '.mkv', '.webm']:
+                with suppress_output():
+                    pip_clip = VideoFileClip(asset_path)
+                    if pip_clip.duration < duration:
+                        pip_clip = pip_clip.loop(duration=duration)
+                    else:
+                        pip_clip = pip_clip.subclip(0, duration)
+            else:
+                pip_clip = ImageClip(asset_path, duration=duration)
+            
+            pip_clip = pip_clip.resize(width=PIP_WIDTH)
+            
+            x_pos = (TARGET_W - pip_clip.w) / 2
+            y_pos = (TARGET_H / 2) - pip_clip.h - PIP_Y_OFFSET
+            y_pos = max(50, y_pos)
+            
+            return pip_clip.set_start(start_time).set_pos((x_pos, y_pos))
+            
+        except Exception as e:
+            print(f"Error creating PIP asset clip: {e}")
+            return None
 
     def _create_avatar_clips(self, word_data_list):
         """Create animated avatar clips based on the active speaker (role) using Pillow 
         for robust transparency and flipping."""
         avatar_clips = []
-        active_role = None
         offset = VIDEO_PADDING_START 
         
         # --- Dynamic Layout Assignment ---
@@ -237,30 +327,8 @@ class ReelGenerator:
                     break 
         # ---------------------------------
 
-
-        # 3. Group word data by role/speaker to define segments
-        speaker_segments = []
-        for word_data in word_data_list:
-            role = word_data['role']
-            current_start = word_data['start']
-            current_end = word_data['end']
-            
-            if role != active_role:
-                if active_role is not None and speaker_segments:
-                    # Finalize the previous segment's end time
-                    speaker_segments[-1]['end'] = current_start
-                
-                # Start a new segment
-                active_role = role
-                speaker_segments.append({
-                    'role': role,
-                    'start': current_start,
-                    'end': current_end, 
-                })
-            else:
-                # Continue the current segment, extending the end time
-                speaker_segments[-1]['end'] = current_end
-        
+        # 3. Get speaker segments
+        speaker_segments = self._get_speaker_segments(word_data_list)
         
         # 4. Process and create avatar clip for each speaking segment
         processed_avatar_paths = {} # Cache processed paths to reuse them
@@ -404,11 +472,10 @@ class ReelGenerator:
         
         try:
             # Re-importing locally in case the global imports were missed in previous steps
-            from processors.audio_generator import (
-                load_input_json, 
-                generate_multi_role_audio_multiprocess, 
-                filter_word_data
-            )
+            # Re-importing locally in case the global imports were missed in previous steps
+            # Using same strategy as global
+            pass # Already imported at top
+
             
             os.makedirs(TEMP_DIR, exist_ok=True)
             os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -458,6 +525,31 @@ class ReelGenerator:
                         # If you want it to appear only on the first instance, uncomment the break below
                         # break 
             
+            # 7.5 Create PIP Asset Clip (Optional)
+            speaker_segments = self._get_speaker_segments(word_data_list)
+            pip_clips = []
+            if len(speaker_segments) >= 3:
+                # Start after first line finishes (end of first segment)
+                # Disappear after 2 line before (start of the segment 2 turns before end)
+                # If total segments = N, we want it to end when segment N-2 starts (0-indexed)
+                pip_start = speaker_segments[0]['end'] + offset
+                pip_end = speaker_segments[-3]['end'] + offset # End of the segment before the last two segments start speaking
+                
+                # Correct logic for "disappear after 2 line before in the end":
+                # Line N (last), Line N-1 (second to last).
+                # It should disappear before Line N-1 starts.
+                pip_end = speaker_segments[-2]['start'] + offset
+
+                pip_asset_clip = self._create_pip_asset_clip(pip_start, pip_end)
+                if pip_asset_clip:
+                    pip_clips.append(pip_asset_clip)
+            elif len(speaker_segments) > 1:
+                 # Minimal case: if only 2 or 3 lines exist, maybe we don't show or adapt
+                 # Task says "after first line" and "2 line before in the end"
+                 # If total lines = 3: after Line 1, before Line 2 starts? That's just during Line 1's gap?
+                 # If total lines = 4: after Line 1, before Line 3 starts (disappears before last 2 lines).
+                 pass
+            
             # 8. Pad audio with silence at the start
             # Create a silent audio clip of the padding duration (0.5s)
             silence_clip = AudioClip(lambda t: 0, duration=VIDEO_PADDING_START)
@@ -475,7 +567,7 @@ class ReelGenerator:
             
             # 9. Compose Final Clip
             final_clip = CompositeVideoClip(
-                [final_video_clip] + text_clips + avatar_clips + follow_animation_clips, # ADDED follow_animation_clips
+                [final_video_clip] + text_clips + avatar_clips + follow_animation_clips + pip_clips, # ADDED follow_animation_clips & pip_clips
                 size=(TARGET_W, TARGET_H)
             )
             final_clip = final_clip.set_audio(final_audio_clip)

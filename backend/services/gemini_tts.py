@@ -5,7 +5,17 @@ import struct
 import mimetypes
 from google import genai
 from google.genai import types
-from config import GEMINI_API_KEY_NAME
+from dotenv import load_dotenv
+try:
+    from ..config import GEMINI_API_KEY_NAME
+except ImportError:
+    try:
+        from config import GEMINI_API_KEY_NAME
+    except ImportError:
+        GEMINI_API_KEY_NAME = "GEMINI_API_KEY"
+
+# Load environment variables (force reload to ensure .env takes precedence)
+load_dotenv(override=True)
 
 # --- Utility Functions ---
 

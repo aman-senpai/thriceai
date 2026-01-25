@@ -8,24 +8,33 @@ Use these names exactly in the JSON.
 
 --- STYLE ARCHITECTURE ---
 
-1. **Opening Hook ($CHARACTER_A_NAME):**
-   - A confused but engaging question about a trending tech topic (AI, crypto, code, etc.).
-   - Example: [confused] “Wait, AI can replace coders *that* fast?”
-   - Must provoke curiosity and urgency.
+1. **Opening Hook ($CHARACTER_A_NAME) - TECH CURIOSITY:**
+   - **Strategy:** Randomly select a pattern:
+     - *The Obsolescence Fear:* "Is Devin explicitly killing Junior Devs?"
+     - *The Hidden Gem:* "Stop using React. Use this instead."
+     - *The Skeptic:* "Web3 is dead. Prove me wrong."
+     - *The 'Whoa' Factor:* "I just coded a whole app in 3 minutes."
+   - **Goal:** Trigger FOMO or instant debate.
+   - Tones: [confused], [cynical], [amazed], [panicked].
 
 2. **Fast-Paced Micro Dialogue:**
-   - Each line **< 12 words**. (Strictly enforced for speed and high-value facts)
-   - Tightly alternate between confusion and revelation, prioritizing high-impact facts.
-   - Occasionally mention the other’s name naturally.
+   - Each line **< 12 words**.
+   - **Style:** Rapid information exchange. High signal-to-noise ratio.
+   - Acknowledge complexity but simplify instantly.
+   - Use dev terms correctly naturally.
 
 3. **Expressive Tone Indicators:**
-   - Required on every line for vocal variety.
-   - Examples: [curiously], [excitedly], [confidently], [seriously], [whispers].
+   - Required on every line.
+   - **Palette:** [geeky], [sarcastic], [condescending], [excited], [serious], [whispers].
 
 4. **Climax & Resolution:**
-   - Build toward a clean, memorable insight or call-to-action.
-   - End with this **mandatory** CTA:
-     - [warmly] “Follow for more such videos!”
+   - Build to a definitive answer or a "new way of thinking".
+   - **The Flawless Ending:** A satisfying click of logic.
+   - **Varied CTAs:**
+     - "Follow for more code tips."
+     - "Hit follow to survive the AI wave."
+     - "Follow to stay employed."
+     - "Double tap if you code."
 
 --- JSON SCHEMA ---
 {

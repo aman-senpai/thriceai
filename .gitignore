@@ -1,41 +1,98 @@
 # ------------------------------------
-# 1. Environment and Python Build Files
+# 1. Environment and Python
 # ------------------------------------
-# Ignore virtual environment directory
+# Virtual environments
 venv/
+.venv/
+env/
+
+# Environment variables
 .env
+.env.*.local
+check_key.py
 
-# Byte-compiled Python files
+# Byte-compiled / optimized / DLL files
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 
-# Distribution/build artifacts
-*.egg-info/
-dist/
+# Distribution / Packaging
 build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
+# ------------------------------------
+# 2. Web App (Next.js / Node)
+# ------------------------------------
+web_app/node_modules/
+web_app/.next/
+web_app/out/
+web_app/build/
+web_app/.DS_Store
+web_app/*.log
+web_app/.env
+web_app/.env.local
+web_app/.env.development.local
+web_app/.env.test.local
+web_app/.env.production.local
 
-# Ignore all temporary processing files
+# ------------------------------------
+# 3. Project Data & Outputs
+# ------------------------------------
+# Temporary processing directory
+temp/
 temp_files/
 
-**/*.mp4 
+# Outputs
+data/reels/*.mp4
+# Keep .gitkeep in reels if it exists, otherwise ignore the directory content
+# Ignoring all mp4s is safer for repo size unless specified otherwise
+*.mp4
+*.mov
+*.avi
+*.mkv
 
+# Generated Content (if you don't want to track generated JSONs)
+data/contents/*.json
+!data/contents/example.json 
+# ^ Keep an example if one exists, or remove this line if you want to ignore all.
 
-
+# Generated Captions
+data/contents/captions/*
 
 # ------------------------------------
-# 3. Operating System / IDE Files
+# 4. Operating System / IDE Files
 # ------------------------------------
-# macOS files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
-# Common IDE files (VS Code, PyCharm)
+# IDEs
 .idea/
 .vscode/
+*.swp
+*.swo
 
 # ------------------------------------
-# 4. Miscellaneous
+# 5. Logs
 # ------------------------------------
-prompt.txt
-contents/*.json
-
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

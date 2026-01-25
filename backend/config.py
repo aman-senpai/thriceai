@@ -5,14 +5,30 @@ import os
 import contextlib
 import json 
 import sys
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# --- DIRECTORY CONFIGURATION ---
+# Determine project root (assuming this file is in backend/config.py)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+
 
 # --- NEW FOLLOW ANIMATION CONFIGURATION ---
-FOLLOW_ANIMATION_PATH = "assets/follow_animation/follow animation.webp"
+FOLLOW_ANIMATION_PATH = os.path.join(DATA_DIR, "assets", "follow_animation", "follow animation.webp")
 FOLLOW_TRIGGER_WORD = "follow" # The word that triggers the animation
 ANIMATION_DURATION = 1.0       # Duration (in seconds) the animation should play for
 ANIMATION_Y_POS = 100          # Y position for the animation on screen
 ANIMATION_SCALE = 0.5          # Scale factor for the animation
 # -----------------------------------------
+
+# --- PIP ASSET CONFIGURATION ---
+PIP_DIR = os.path.join(DATA_DIR, "assets", "pip")
+PIP_WIDTH = 900                # Width of the PIP asset
+PIP_Y_OFFSET = 100             # Distance above the captions (if centered) or from top
+# -------------------------------
 
 # --- API KEY NAME ---
 ELEVEN_API_KEY_NAME = "ELEVEN_API" 
@@ -32,15 +48,20 @@ TTS_PROCESS_CONFIG = {
 
 
 # --- DIRECTORY CONFIGURATION ---
-INPUT_DIR = "contents" 
-VIDEO_DIR = "assets/bg_videos"
-AVATAR_DIR = "assets/avatars" 
-OUTPUT_DIR = "reels" 
-TEMP_DIR = "temp"
-PROMPTS_DIR = "prompts"
-CHARACTER_CONFIG_FILE = "characters.json"
-CAPTION_DIR = "contents/captions"
-CAPTION_SYSTEM_PROMPT_PATH = "prompts/captions/blinked_thrice.txt"
+# Determine project root (assuming this file is in backend/config.py)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+
+
+INPUT_DIR = os.path.join(BASE_DIR, "contents")
+VIDEO_DIR = os.path.join(DATA_DIR, "assets", "bg_videos")
+AVATAR_DIR = os.path.join(DATA_DIR, "assets", "avatars")
+OUTPUT_DIR = os.path.join(BASE_DIR, "reels")
+TEMP_DIR = os.path.join(BASE_DIR, "temp") # Keep temp in root or data
+PROMPTS_DIR = os.path.join(DATA_DIR, "prompts")
+CHARACTER_CONFIG_FILE = os.path.join(DATA_DIR, "characters.json")
+CAPTION_DIR = os.path.join(BASE_DIR, "contents", "captions")
+CAPTION_SYSTEM_PROMPT_PATH = os.path.join(DATA_DIR, "prompts", "captions", "blinked_thrice.txt")
 
 # Temporary files for processing
 TEMP_AIFF_PATH = os.path.join(TEMP_DIR, "temp_tts_audio_turn_{}.aiff") 
@@ -53,7 +74,7 @@ OUTPUT_FILE = os.path.join(TEMP_DIR, "temp_reel_export.mp4")
 TARGET_W, TARGET_H = 1080, 1920 # Vertical 9:16
 VIDEO_PADDING_START = 0.5  # Seconds of silence at start
 VIDEO_PADDING_END = 0.5    # Seconds of silence at end
-FONT = "fonts/Inter_24pt-ExtraBoldItalic.ttf.ttf" 
+FONT = os.path.join(DATA_DIR, "fonts", "Inter_24pt-ExtraBoldItalic.ttf.ttf") 
 FONT_SIZE = 105
 TEXT_COLOR = 'white'
 STROKE_COLOR = 'black'

@@ -13,18 +13,34 @@ import whisper_timestamped as whisper
 import re 
 
 # Import necessary components from config
-from config import (
-    CHARACTER_MAP, 
-    TEMP_AIFF_PATH, 
-    TEMP_MP3_PATH,
-    TEMP_WAV_PATH,
-    MIN_CLIP_DURATION, 
-    GEMINI_TTS_WAIT_SECONDS,
-    suppress_output,
-    # --- NEW IMPORTS ---
-    DEFAULT_TTS_PROCESSES,
-    TTS_PROCESS_CONFIG
-)
+# Import necessary components from config
+try:
+    from ..config import (
+        CHARACTER_MAP, 
+        TEMP_AIFF_PATH, 
+        TEMP_MP3_PATH,
+        TEMP_WAV_PATH,
+        MIN_CLIP_DURATION, 
+        GEMINI_TTS_WAIT_SECONDS,
+        suppress_output,
+        # --- NEW IMPORTS ---
+        DEFAULT_TTS_PROCESSES,
+        TTS_PROCESS_CONFIG
+    )
+except ImportError:
+    from config import (
+        CHARACTER_MAP, 
+        TEMP_AIFF_PATH, 
+        TEMP_MP3_PATH,
+        TEMP_WAV_PATH,
+        MIN_CLIP_DURATION, 
+        GEMINI_TTS_WAIT_SECONDS,
+        suppress_output,
+        # --- NEW IMPORTS ---
+        DEFAULT_TTS_PROCESSES,
+        TTS_PROCESS_CONFIG
+    )
+
 
 # --- CONFIGURATION FOR RETRY ---
 MAX_GEMINI_RETRIES = 6
@@ -33,29 +49,50 @@ GEMINI_API_NO_AUDIO_DATA = "no audio data"
 
 # Import the services (assuming these are correct and handle the voice_id passed)
 try:
-    import services.elevenlabs_tts as elevenlabs_tts
+    try:
+        from ..services import elevenlabs_tts
+    except ImportError:
+        import services.elevenlabs_tts as elevenlabs_tts
 except ImportError:
     class ElevenLabsServiceStub:
         def is_service_available(self): return False
         def generate_audio(self, *args, **kwargs): raise NotImplementedError("ElevenLabs service not implemented.")
     elevenlabs_tts = ElevenLabsServiceStub()
 
+
 try:
-    import services.gemini_tts as gemini_tts
-    GEMINI_RATE_LIMIT_ERROR_CODE = "429 RESOURCE_EXHAUSTED"
-except ImportError:
+    try:
+        from ..services import gemini_tts
+        GEMINI_RATE_LIMIT_ERROR_CODE = "429 RESOURCE_EXHAUSTED"
+    except ImportError as e1:
+        try:
+            import services.gemini_tts as gemini_tts
+            GEMINI_RATE_LIMIT_ERROR_CODE = "429 RESOURCE_EXHAUSTED"
+        except ImportError as e2:
+            print(f"DEBUG: Failed to import gemini_tts: {e1} | {e2}")
+            class GeminiServiceStub:
+                def is_service_available(self): return False
+                def generate_audio(self, *args, **kwargs): raise NotImplementedError("Gemini service not implemented.")
+            gemini_tts = GeminiServiceStub()
+except Exception as e:
+    print(f"DEBUG: Unexpected error importing gemini_tts: {e}")
     class GeminiServiceStub:
         def is_service_available(self): return False
         def generate_audio(self, *args, **kwargs): raise NotImplementedError("Gemini service not implemented.")
     gemini_tts = GeminiServiceStub()
 
+
 try:
-    import services.mac_say_tts as mac_say_tts
+    try:
+        from ..services import mac_say_tts
+    except ImportError:
+        import services.mac_say_tts as mac_say_tts
 except ImportError:
     class MacSayServiceStub:
         def is_service_available(self): return False
         def generate_audio(self, *args, **kwargs): raise NotImplementedError("MacSay service not implemented.")
     mac_say_tts = MacSayServiceStub()
+
 
 
 # --- VOICE ID LOOKUP UTILITY ---

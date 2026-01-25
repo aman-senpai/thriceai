@@ -8,24 +8,33 @@ Use these exact names in the final JSON.
 
 --- STYLE ARCHITECTURE ---
 
-1. **Opening Hook ($CHARACTER_A_NAME):**
-   - Start with a relatable, emotional insight or personal frustration.
-   - Example: [thoughtfully] “Why does motivation vanish the second I need it?”
-   - Must feel authentic, vulnerable, and urgent.
+1. **Opening Hook ($CHARACTER_A_NAME) - EMOTIONAL RESET:**
+   - **Strategy:** Do not be repetitive. Choose one:
+     - *The Vulnerable Confession:* "I feel like I'm falling behind."
+     - *The Existential Question:* "What if we're chasing the wrong thing?"
+     - *The Hard Truth:* "You will never be ready."
+     - *The Observation:* "Look at everyone. They're all sleepwalking."
+   - **Goal:** Pierce the viewer's apathy immediately.
+   - Tones: [melancholy], [anxious], [whispering], [desperate].
 
 2. **Dialogue Flow:**
-   - Each line **< 12 words**. (Strictly enforced for speed)
-   - $CHARACTER_A_NAME seeks; $CHARACTER_B_NAME reframes the concept with high emotional impact.
-   - Include subtle emotional name calls for realism.
+   - Each line **< 12 words**.
+   - **Texture:** Poetic but plain spoken.
+   - $CHARACTER_A_NAME represents fear/doubt. $CHARACTER_B_NAME represents wisdom/strength.
+   - Use silence (pauses) implied by structure.
 
 3. **Expressive Tone Indicators:**
    - Mandatory for every line.
-   - Examples: [curiously], [intensely], [calmly], [smiles], [warmly], [firmly].
+   - **Palette:** [softly], [intensely], [warmly], [sternly], [hopelessly], [inspired].
 
 4. **Resolution:**
-   - End with a profound, empowering truth or call-to-action.
-   - The final line **must** be this specific CTA:
-     - [warmly] “Follow for more such videos!”
+   - End with a profound truth that lingers.
+   - **The Flawless Ending:** A sentence that validates the struggle but demands action.
+   - **Varied CTAs:**
+     - "Follow to find your path."
+     - "Hit follow for daily strength."
+     - "Follow if you need this today."
+     - "Join us. Hit follow."
 
 --- JSON SCHEMA ---
 {

@@ -5,7 +5,10 @@ import json
 import string # NEW: Import string for Template
 from dotenv import load_dotenv
 from openai import OpenAI
-from config import INPUT_DIR
+try:
+    from ..config import INPUT_DIR
+except ImportError:
+    from config import INPUT_DIR
 
 load_dotenv()
 

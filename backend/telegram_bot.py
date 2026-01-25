@@ -9,7 +9,6 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 load_dotenv()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT")
-# TELEGRAM_CHAT_ID is not needed here as the bot responds in the channel it receives the message from
 
 def get_local_ip_address():
     """Fetches the local IP address."""
@@ -37,25 +36,38 @@ async def ip_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     except Exception as e:
         print(f"Error sending response: {e}")
 
-
-def start_bot() -> None:
-    """Starts the bot."""
+async def run_bot_async() -> None:
+    """Asynchronous bot starter to ensure a clean event loop context."""
     if not TELEGRAM_BOT_TOKEN:
         print("TELEGRAM_BOT token not found in environment variables.")
         return
 
-    # Create the Application and pass it your bot's token.
+    # Create the Application
     application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
-    # Add a message handler that filters for the exact text "ip" in the channel
-    # This responds whether the user types "ip", "IP", "Ip", etc.
+    # Add handlers
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.Regex(r'(?i)\bip\b'), ip_handler))
-
-    # Add a command handler for the traditional /ip command as well
     application.add_handler(CommandHandler("ip", ip_handler))
 
-    # Run the bot until the user presses Ctrl-C or the process receives SIGINT, SIGTERM or SIGABRT
-    print("Bot is running... Type 'ip' or '/ip' in the channel to get the address.")
-    application.run_polling(poll_interval=3.0)
+    # Initialize and start
+    print("Bot is starting... Type 'ip' or '/ip' in the channel to get the address.")
+    
+    # Use the context manager to ensure proper cleanup
+    async with application:
+        await application.initialize()
+        await application.start()
+        await application.updater.start_polling(poll_interval=3.0)
+        
+        # This keeps the bot running until it's stopped
+        while True:
+            await asyncio.sleep(3600) # Sleep for an hour and repeat
 
-
+def start_bot() -> None:
+    """Starts the bot. This is the entry point for the multiprocessing.Process."""
+    try:
+        # We use asyncio.run to create a new event loop in this process
+        asyncio.run(run_bot_async())
+    except KeyboardInterrupt:
+        print("Bot process interrupted.")
+    except Exception as e:
+        print(f"Error in bot process: {e}")

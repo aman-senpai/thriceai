@@ -8,32 +8,40 @@ All lines must use these two names as the 'role' field in the final JSON.
 
 --- STYLE ARCHITECTURE ---
 
-1. **Opening Hook ($CHARACTER_A_NAME):**
-   - Begin with a *contrarian, high-stakes, emotionally charged* claim about finance or business myths — retirement, saving, debt, or investing.
-   - It must spark curiosity or disbelief.
-   - Example tones: [skeptically], [sarcastically], [shocked].
-   - Example: [skeptically] “Wait, saving money makes you poorer?”
+1. **Opening Hook ($CHARACTER_A_NAME) - MAXIMIZE RETENTION:**
+   - **Strategy:** Do NOT rely on a single formula. Mix it up:
+     - *The Contrarian:* "Saving money is actually ruining you."
+     - *The Shocking Stat:* "99% of people get this wrong about debt."
+     - *The 'What If':* "What if you could retire in 5 years?"
+     - *The Urgent Warning:* "Stop buying [Asset] right now."
+   - **Execution:** Needs to be instant, harsh, or incredibly curious.
+   - Tones: [skeptically], [sarcastically], [shocked], [urgently].
 
 2. **Fast-Paced Micro Dialogue:**
-   - Each line **< 12 words**. (Strictly enforced for speed and maximum financial insight)
-   - Keep the rhythm fast and emotionally responsive.
-   - Alternate between curiosity ($CHARACTER_A_NAME) and calm authority ($CHARACTER_B_NAME).
-   - Occasionally call the other’s name for realism: “Come on, Isha,” or “Aman, you’re missing it.”
+   - Each line **< 12 words**. (Speed is key)
+   - **Dynamic Flow:** Avoid boring Q&A. Use rapid-fire exchanges.
+   - **Tension:** Create immediate intellectual conflict. A challenges, B corrects (or vice versa).
+   - occasional use of names ($CHARACTER_A_NAME, $CHARACTER_B_NAME) to ground it.
 
 3. **Expressive Tone Indicators:**
-   - Each line **must** include 1 tone cue in brackets.
-   - Use expressive cues: [thoughtfully], [sarcastically], [intensely], [curiously], [confidently], [whispers], [firmly].
-   - Never exceed two tone tags per line.
+   - **Mandatory:** Every line needs a tone.
+   - **Palette:** [coldly], [warmly], [laughing], [scoffs], [intensely], [whispers].
+   - Use tones to replace words (e.g., a scoff instead of "I doubt that").
 
-4. **Climax & Resolution:**
-   - Build toward a single, striking financial truth or mindset shift.
-   - End decisively, then include this **mandatory** CTA:
-     - [warmly] “Follow for more such videos!”
+4. **Flawless Ending & Resolution:**
+   - Build to a specific financial epiphany.
+   - **The Closer:** Strong, actionable advice or a mindset shift.
+   - **Varied CTAs:**
+     - "Follow to grow your net worth."
+     - "Hit follow if you want to be rich."
+     - "Follow for more money myths."
+     - "Save this for later."
+   - Keep the final line sharp.
 
 5. **Safety & Structure:**
    - Max 10 turns (5 each).
    - Keep total words under 500.
-   - Maintain JSON structure and valid syntax.
+   - **Uniqueness Check:** Ensure this script stands out. Do not reuse the same 'Saving is bad' trope unless the angle is new.
 
 --- JSON SCHEMA ---
 {

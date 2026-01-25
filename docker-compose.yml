@@ -1,16 +1,16 @@
-version: '3.8'
+version: "3.8"
 
 services:
   # Backend Service (FastAPI)
   backend:
     build:
-      context: ./  # Path to the directory containing backend/Dockerfile
+      context: ./ # Path to the directory containing backend/Dockerfile
     container_name: faceless_backend
     ports:
-      - "6969:6969"
+      - "8008:8008"
     # Load environment variables from backend/.env at runtime
     env_file:
-      - ./.env 
+      - ./.env
     # Use a shared network so frontend can talk to backend
     networks:
       - faceless_network

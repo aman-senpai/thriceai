@@ -7,12 +7,16 @@ from openai import OpenAI
 
 # Assuming CAPTION_DIR and CAPTION_SYSTEM_PROMPT_PATH are in config
 try:
-    from config import CAPTION_DIR, CAPTION_SYSTEM_PROMPT_PATH
+    try:
+        from ..config import CAPTION_DIR, CAPTION_SYSTEM_PROMPT_PATH
+    except ImportError:
+        from config import CAPTION_DIR, CAPTION_SYSTEM_PROMPT_PATH
 except ImportError:
     # Fallback/error handling if config isn't set up yet
-    CAPTION_DIR = "outputs/captions"
+    CAPTION_DIR = "outputs/captions" # This likely won't work perfectly but serves as a fallback
     CAPTION_SYSTEM_PROMPT_PATH = "prompts/captions/blinked_thrice.txt"
     print("Warning: Could not import config variables for caption generation.")
+
 
 
 load_dotenv()

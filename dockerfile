@@ -34,9 +34,9 @@ RUN apt-get update && \
 COPY . .
 
 # Expose the application's port
-EXPOSE 6969
+EXPOSE 8008
 
 # *** UPDATED CMD INSTRUCTION ***
 # Command format: uvicorn <module_name>:<app_instance> --host 0.0.0.0 --port <port>
 # Since your file is main.py, the module name is 'main'.
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "6969"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8008"]

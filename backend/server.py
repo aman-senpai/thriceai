@@ -5,10 +5,10 @@ import glob
 import sys
 import uvicorn
 import json
-from fastapi import FastAPI, Request, Form, HTTPException
+from fastapi import FastAPI, Request, Form, HTTPException, File, UploadFile
 from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from fastapi.middleware.cors import CORSMiddleware
 import time
 
@@ -17,11 +17,17 @@ import time
 # Ensure these imports are correct for your project structure
 try:
     # Assuming config.py now includes CAPTION_DIR
-    from config import INPUT_DIR, PROMPTS_DIR, CHARACTER_MAP, TEMP_DIR, VIDEO_DIR, OUTPUT_DIR, CAPTION_DIR
-    from services.content_writer import generate_content
-    # NEW IMPORT: The function is now in the services folder
-    from services.caption_generator import generate_caption 
-    from processors.reel_generator import ReelGenerator 
+    try:
+        from .config import INPUT_DIR, PROMPTS_DIR, CHARACTER_MAP, TEMP_DIR, VIDEO_DIR, OUTPUT_DIR, CAPTION_DIR, AVATAR_DIR, PIP_DIR
+        from .services.content_writer import generate_content
+        from .services.caption_generator import generate_caption 
+        from .processors.reel_generator import ReelGenerator 
+    except ImportError:
+        # Fallback for when running directly or PYTHONPATH is set to backend
+        from config import INPUT_DIR, PROMPTS_DIR, CHARACTER_MAP, TEMP_DIR, VIDEO_DIR, OUTPUT_DIR, CAPTION_DIR, AVATAR_DIR, PIP_DIR
+        from services.content_writer import generate_content
+        from services.caption_generator import generate_caption 
+        from processors.reel_generator import ReelGenerator 
 except ImportError as e:
     print(f"Error importing modules (Check config.py, services/, processors/): {e}")
     sys.exit(1)
@@ -77,6 +83,7 @@ app = FastAPI(title="Faceless Reel Generator API")
 
 app.mount("/reels", StaticFiles(directory=OUTPUT_DIR), name="reels")
 app.mount("/contents", StaticFiles(directory=INPUT_DIR), name="contents")
+app.mount("/avatars", StaticFiles(directory=AVATAR_DIR), name="avatars")
 
 # --- Schemas and Global State ---
 
@@ -98,10 +105,18 @@ current_session_files: List[ContentFile] = []
 @app.get("/api/data/config")
 async def get_config_data_api():
     """Returns initial configuration data and character details."""
+    # Create config-ready character map with accessible avatar URLs
+    api_character_map = {}
+    for name, details in CHARACTER_MAP.items():
+        api_character_map[name] = details.copy()
+        # Prepend /avatars/ if it's a simple filename
+        if "avatar" in details and not details["avatar"].startswith(("http", "/")):
+             api_character_map[name]["avatar"] = f"/avatars/{details['avatar']}"
+
     return {
         "tts_modes": ['gemini', 'elevenlabs', 'mac_say'],
         "prompt_files": get_prompt_files(),
-        "characters": CHARACTER_MAP, 
+        "characters": api_character_map, 
         "session_count": len(current_session_files)
     }
 
@@ -132,6 +147,7 @@ async def get_reels_api():
                 "content_exists": False
             })
             
+    reels_list.sort(key=lambda x: x["modified"], reverse=True)
     return {"reels": reels_list}
 
 @app.get("/api/data/contents")
@@ -174,6 +190,7 @@ async def get_contents_api():
                 "dialogues": []
             })
             
+    contents_list.sort(key=lambda x: x["modified"], reverse=True)
     return {"contents": contents_list}
 
 
@@ -265,6 +282,110 @@ async def generate_caption_api(filename: str):
         raise HTTPException(status_code=500, detail=f"Server error during caption generation: {e}")
 
 
+@app.post("/api/upload-asset")
+async def upload_asset_api(file: UploadFile = File(...)):
+    """API endpoint to upload a PIP asset (image or video)."""
+    os.makedirs(PIP_DIR, exist_ok=True)
+    
+    # We clear the directory first to ensure only one asset is active
+    for f in glob.glob(os.path.join(PIP_DIR, "*")):
+        try:
+            os.remove(f)
+        except Exception as e:
+            print(f"Error removing old asset: {e}")
+
+    file_path = os.path.join(PIP_DIR, file.filename)
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        return {"message": f"Asset {file.filename} uploaded successfully", "filename": file.filename}
+    except Exception as e:
+        print(f"Error saving uploaded asset: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to save asset: {e}")
+
+@app.get("/api/data/pip-asset")
+async def get_pip_asset_api():
+    """Returns the current PIP asset if it exists."""
+    assets = glob.glob(os.path.join(PIP_DIR, "*"))
+    if assets:
+        return {"filename": os.path.basename(assets[0]), "exists": True}
+    return {"filename": None, "exists": False}
+
+@app.post("/api/clear-pip-asset")
+async def clear_pip_asset_api():
+    """Clears the current PIP asset."""
+    for f in glob.glob(os.path.join(PIP_DIR, "*")):
+        try:
+            os.remove(f)
+        except Exception:
+            pass
+    return {"message": "PIP asset cleared"}
+
+@app.post("/api/update-content")
+async def update_content_api(
+    file_name: str = Form(...),
+    content: str = Form(...)
+):
+    """
+    API endpoint to update an existing content JSON file.
+    Parses the text-based script back into the expected JSON format.
+    """
+    if not file_name.endswith(".json"):
+        file_name += ".json"
+    
+    file_path = os.path.join(INPUT_DIR, file_name)
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail=f"File {file_name} not found.")
+
+    try:
+        # Parse the content back to JSON structure
+        # Expected format in text: "SPEAKER: Dialogue"
+        lines = content.split('\n')
+        conversation = []
+        
+        # Simple extraction logic for the formatted text sent by frontend
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith('//') or line.startswith('---'):
+                continue
+            
+            if ':' in line:
+                speaker, text = line.split(':', 1)
+                conversation.append({
+                    "role": speaker.strip().capitalize(),
+                    "text": text.strip()
+                })
+        
+        if not conversation:
+             raise HTTPException(status_code=400, detail="Could not parse any valid dialogue lines from the content.")
+
+        # Re-construct the JSON object
+        # We try to preserve the original query/topic if possible
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                original_data = json.load(f)
+        except:
+            original_data = {}
+
+        updated_data = {
+            "query": original_data.get("query", "Updated manually"),
+            "conversation": conversation
+        }
+
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(updated_data, f, indent=4)
+            
+        return {"message": f"Successfully updated and reformatted {file_name}"}
+    except Exception as e:
+        print(f"Error updating content: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update content: {e}")
+
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "timestamp": time.time()}
+
+
 @app.post("/api/generate-reels/session")
 async def generate_session_reels_api(audio_mode: str = Form(...)):
     """API endpoint to trigger reel generation for current session files."""
@@ -301,6 +422,7 @@ async def startup_event():
     os.makedirs(PROMPTS_DIR, exist_ok=True)
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     os.makedirs(CAPTION_DIR, exist_ok=True)
+    os.makedirs(PIP_DIR, exist_ok=True)
     print("Application startup: Directories confirmed.")
 
 @app.on_event("shutdown")
@@ -321,7 +443,7 @@ def run_server():
         allow_headers=["*"],
     )
     
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8008)
 
 if __name__ == "__main__":
     print("Starting FastAPI server directly (for testing)...")

@@ -65,12 +65,12 @@ data/reels/*.mp4
 *.mkv
 
 # Generated Content (if you don't want to track generated JSONs)
-data/contents/*.json
-!data/contents/example.json 
+contents/*.json
+!contents/example.json 
 # ^ Keep an example if one exists, or remove this line if you want to ignore all.
 
 # Generated Captions
-data/contents/captions/*
+contents/captions/*
 
 # ------------------------------------
 # 4. Operating System / IDE Files
@@ -96,3 +96,9 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# ------------------------------------
+# 6. Local Development / Temp
+# ------------------------------------
+test_run.py
+data/assets/pip/

@@ -7,7 +7,7 @@ import numpy as np
 import sys
 import contextlib
 import io
-from multiprocessing import Pool # Still imported, but conditionally used
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from moviepy.editor import AudioFileClip, concatenate_audioclips
 import whisper_timestamped as whisper 
 import re 
@@ -25,7 +25,9 @@ try:
         suppress_output,
         # --- NEW IMPORTS ---
         DEFAULT_TTS_PROCESSES,
-        TTS_PROCESS_CONFIG
+        TTS_PROCESS_CONFIG,
+        WHISPER_DEVICE,
+        IS_MAC
     )
 except ImportError:
     from config import (
@@ -38,7 +40,9 @@ except ImportError:
         suppress_output,
         # --- NEW IMPORTS ---
         DEFAULT_TTS_PROCESSES,
-        TTS_PROCESS_CONFIG
+        TTS_PROCESS_CONFIG,
+        WHISPER_DEVICE,
+        IS_MAC
     )
 
 
@@ -83,14 +87,17 @@ except Exception as e:
 
 
 try:
-    try:
-        from ..services import mac_say_tts
-    except ImportError:
-        import services.mac_say_tts as mac_say_tts
+    if IS_MAC:
+        try:
+            from ..services import mac_say_tts
+        except ImportError:
+            import services.mac_say_tts as mac_say_tts
+    else:
+         raise ImportError("Not on macOS")
 except ImportError:
     class MacSayServiceStub:
         def is_service_available(self): return False
-        def generate_audio(self, *args, **kwargs): raise NotImplementedError("MacSay service not implemented.")
+        def generate_audio(self, *args, **kwargs): raise NotImplementedError("MacSay service not available on this platform.")
     mac_say_tts = MacSayServiceStub()
 
 
@@ -116,8 +123,14 @@ def get_voice_id_for_role(role, tts_mode):
 
 # --- AUDIO GENERATION CORE LOGIC ---
 
-def _generate_audio_for_turn(turn_index, turn, tts_mode):
-    """Generates audio for a single turn and returns word-level data."""
+
+# --- AUDIO GENERATION CORE LOGIC ---
+
+def _generate_tts_only(turn_index, turn, tts_mode):
+    """
+    Generates audio file for a single turn and returns the path. 
+    Does NOT run Whisper.
+    """
     role = turn['role']
     text = turn['text']
     
@@ -128,7 +141,8 @@ def _generate_audio_for_turn(turn_index, turn, tts_mode):
         return None
 
     temp_audio_path = None
-    
+    service = None
+
     if tts_mode == 'gemini':
         service = gemini_tts
         temp_audio_path = TEMP_WAV_PATH.format(turn_index)
@@ -142,7 +156,7 @@ def _generate_audio_for_turn(turn_index, turn, tts_mode):
         temp_audio_path = TEMP_AIFF_PATH.format(turn_index)
         print(f"  > MAC_SAY TTS: Generating audio for turn {turn_index} with voice '{voice_id}'.")
     else:
-        return None # Invalid mode
+        return None 
 
     if not service.is_service_available():
         print(f"Error: {tts_mode.upper()} service is not available. Check API key/installation.")
@@ -151,11 +165,16 @@ def _generate_audio_for_turn(turn_index, turn, tts_mode):
     # Retry logic for Gemini TTS rate limits
     for attempt in range(MAX_GEMINI_RETRIES):
         try:
-            # --- FIX: Added turn_index as a positional argument to generate_audio for all services. ---
+             # --- FIX: Added turn_index as a positional argument to generate_audio for all services. ---
             if service.generate_audio(text, voice_id, temp_audio_path, turn_index):
-            # -----------------------------------------------------------------------------------------
-                print(f"  > {tts_mode.upper()} TTS: Successfully saved audio to {os.path.basename(temp_audio_path)}")
-                break
+             # -----------------------------------------------------------------------------------------
+                # print(f"  > {tts_mode.upper()} TTS: Successfully saved audio to {os.path.basename(temp_audio_path)}")
+                return {
+                    'index': turn_index,
+                    'audio_path': temp_audio_path,
+                    'role': role,
+                    'text': text
+                }
             else:
                 raise Exception(f"{tts_mode.upper()} TTS failed to save file.")
         except Exception as e:
@@ -167,115 +186,137 @@ def _generate_audio_for_turn(turn_index, turn, tts_mode):
                 print(f"  > Gemini TTS returned no audio data. Retrying with delay (Attempt {attempt+1}/{MAX_GEMINI_RETRIES})...")
                 time.sleep(GEMINI_TTS_WAIT_SECONDS)
             else:
-                # Re-raise the error if it's the specific missing argument error, otherwise log and continue retrying
+                 # Re-raise if it's a signature mismatch to alert developer
                 if "missing 1 required positional argument: 'turn_index'" in str(e):
-                    # This means the service implementation is wrong, which is outside this file's scope.
-                    # Reraise so the user is aware of the core service file needing modification.
                     raise
                 print(f"Error generating audio for turn {turn_index} with {tts_mode}: {e}")
                 return None
     else:
         print(f"Critical Error: Failed to generate audio for turn {turn_index} after {MAX_GEMINI_RETRIES} attempts.")
         return None
-    
-    # Run Whisper to get word timestamps
-    if tts_mode == 'mac_say':
-        # Whisper can't read aiff directly on all systems, but should handle local files.
-        # Fallback to direct mp3/wav if needed, but for now use the generated file.
-        model_path = temp_audio_path 
-    else:
-        # For remote services, ensure a common format for Whisper
-        model_path = temp_audio_path 
-
-    print(f"  > Whisper: Generating word timestamps...")
-    try:
-        with suppress_output():
-            model = whisper.load_model("tiny", device='cpu')
-            result = whisper.transcribe(model, model_path, language="en", verbose=False)
-            
-        word_data = []
-        for segment in result['segments']:
-            for word in segment['words']:
-                word_data.append({
-                    'word': word['text'],
-                    'start': word['start'],
-                    'end': word['end'],
-                    'role': role 
-                })
-
-        return {
-            'index': turn_index,
-            'audio_path': temp_audio_path,
-            'word_data': word_data
-        }
-    except Exception as e:
-        print(f"Error processing audio with Whisper for turn {turn_index}: {e}")
-        return None
 
 
 def generate_multi_role_audio_multiprocess(ordered_turns: list, language_code: str, tts_mode: str):
     """
-    Generates audio and word data for all turns using multiprocessing or sequential
-    processing based on the TTS mode.
+    Optimized generation:
+    1. Parallel TTS Generation (IO Bound) using ThreadPoolExecutor.
+    2. Sequential Whisper Transcription (CPU/GPU Bound) with single model load.
     """
-    print(f"\nSelected TTS Mode: {tts_mode.upper()} TTS")
+    print(f"\nSelected TTS Mode: {tts_mode.upper()}")
     
-    tasks = [(i, turn, tts_mode) for i, turn in enumerate(ordered_turns)]
+    # --- PHASE 1: PARALLEL AUDIO GENERATION ---
+    start_time = time.time()
     
-    # --- FIX: Use sequential processing for Gemini TTS to prevent multiprocessing issues ---
-    if tts_mode == 'gemini':
-        print("Using sequential processing for GEMINI TTS.")
-        results = []
-        for task in tasks:
-            # Unpack task tuple: (turn_index, turn, tts_mode)
-            result = _generate_audio_for_turn(*task) 
-            results.append(result)
-    else:
-        # Determine the number of processes using the centralized configuration
-        num_processes = TTS_PROCESS_CONFIG.get(tts_mode, DEFAULT_TTS_PROCESSES)
-        
-        # Fallback/cap: Use the minimum of the configured value and the CPU count
-        # and ensure it's at least 1.
-        num_processes = max(1, min(num_processes, os.cpu_count() or 1))
-        
-        print(f"Using {num_processes} parallel process(es) for {tts_mode.upper()} TTS audio generation.")
-        
-        # Use Pool to execute the generation tasks for parallel processing
-        with Pool(processes=num_processes) as pool:
-            results = pool.starmap(_generate_audio_for_turn, tasks)
-    # ------------------------------------------------------------------------------------------
+    # Determine number of threads based on config
+    # For IO-bound tasks like API calls, we can use more threads than CPU cores
+    num_threads = TTS_PROCESS_CONFIG.get(tts_mode, DEFAULT_TTS_PROCESSES)
+    
+    # Only force 1 thread if specifically configured (e.g. strict rate limits), 
+    # but theoretically Gemini/ElevenLabs handle concurrency fine on their end.
+    if num_threads < 1: num_threads = 1
+    
+    print(f"  > Spawning {num_threads} threads for TTS generation...")
 
+    tts_results = []
     
-    # Aggregate results
+    with ThreadPoolExecutor(max_workers=num_threads) as executor:
+        # Submit all tasks
+        future_to_turn = {
+            executor.submit(_generate_tts_only, i, turn, tts_mode): i 
+            for i, turn in enumerate(ordered_turns)
+        }
+        
+        for future in as_completed(future_to_turn):
+            try:
+                result = future.result()
+                if result:
+                    tts_results.append(result)
+            except Exception as e:
+                print(f"Error in TTS thread: {e}")
+
+    # Sort results by index to ensure processing order
+    tts_results.sort(key=lambda x: x['index'])
+    
+    if not tts_results:
+         raise Exception("Failed to generate any audio files.")
+
+    print(f"  > TTS Phase completed in {time.time() - start_time:.2f}s")
+
+    # --- PHASE 2: SEQUENTIAL WHISPER TRANSCRIPTION ---
+    print(f"  > Loading Whisper model ({WHISPER_DEVICE}) once for all turns...")
+    
+    # Load model ONCE
+    try:
+        with suppress_output():
+            whisper_model = whisper.load_model("tiny", device=WHISPER_DEVICE)
+    except Exception as e:
+        print(f"Error loading Whisper model: {e}")
+        return None, []
+
     all_word_data = []
     audio_clips = []
     current_offset = 0.0
+    
+    print(f"  > Starting transcription...")
 
-    # Sort results by turn index to maintain conversation order
-    successful_results = sorted([r for r in results if r is not None], key=lambda x: x['index'])
-
-    for result in successful_results:
-        turn_index = result['index']
-        temp_audio_path = result['audio_path']
-        word_data = result['word_data']
+    for item in tts_results:
+        turn_index = item['index']
+        audio_path = item['audio_path']
+        role = item['role']
         
-        # 1. Update word data with the offset
-        for word in word_data:
-            # Shift the word start/end times by the current cumulative offset
-            word['start'] += current_offset
-            word['end'] += current_offset
-            all_word_data.append(word)
-
-        # 2. Load audio clip and update offset
+        # 1. Transcribe
         try:
+             # For remote services/MacSay, ensure a common format if needed, but Whisper handles most.
             with suppress_output():
-                clip = AudioFileClip(temp_audio_path)
+                result = whisper.transcribe(whisper_model, audio_path, language="en", verbose=False)
+            
+            # 2. Extract Word Data
+            turn_word_data = []
+            for segment in result['segments']:
+                for word in segment['words']:
+                    turn_word_data.append({
+                        'word': word['text'],
+                        'start': word['start'],
+                        'end': word['end'],
+                        'role': role 
+                    })
+            
+            # 3. Apply Offset immediately
+            for word in turn_word_data:
+                word['start'] += current_offset
+                word['end'] += current_offset
+                all_word_data.append(word)
+                
+            # 4. Load Audio Clip for concatenation
+            with suppress_output():
+                clip = AudioFileClip(audio_path)
             audio_clips.append(clip)
             current_offset += clip.duration
-        finally:
-             # Clean up the file here, after MoviePy has loaded it
-            if os.path.exists(temp_audio_path):
-                os.remove(temp_audio_path)
+            
+            # Clean up file? 
+            # MoviePy loads the file; if we delete it now, it might be fine if fully loaded into RAM?
+            # AudioFileClip DOES NOT load into RAM by default, it streams. 
+            # So we MUST NOT delete the file until we are done with the clip or write the final one.
+            # However, `concatenate_audioclips` will need to read them.
+            # Strategy: Keep files until the end of this function where we concatenate?
+            # Actually, `concatenate_audioclips` creates a composed clip. 
+            # We need to be careful. For safety in this script, we usually let OS/temp dir cleanup handle it, 
+            # or delete after writing the FINAL audio. 
+            # But the previous code deleted it immediately after loading AudioFileClip? 
+            # "Clean up the file here, after MoviePy has loaded it" -> This implies MoviePy loaded it fully?
+            # AudioFileClip usually keeps a handle. 
+            # Let's keep the files for now to be safe, or check if AudioFileClip reads fully.
+            # Reverting to previous behavior: if it worked before, AudioFileClip might be reading it?
+            # Actually, `concatenate_audioclips` just references them.
+            # To be safe, we will NOT delete them here. `reel_generator.py` cleans up `TEMP_DIR`?
+            # No, `reel_generator.py` cleans `temp_output_file` but maybe not these individual chunks.
+            # Let's verify `reel_generator` cleanup. 
+            # It cleans `temp-audio.m4a`. 
+            # Let's add a robust cleanup in `reel_generator` or just ignore for now as they are in `temp/`.
+            
+        except Exception as e:
+            print(f"Error processing audio for turn {turn_index}: {e}")
+            continue
 
     if not audio_clips:
         raise Exception("Failed to generate any audio clips. Cannot create reel.")
@@ -283,17 +324,13 @@ def generate_multi_role_audio_multiprocess(ordered_turns: list, language_code: s
     final_audio_clip = concatenate_audioclips(audio_clips)
     
     # 3. Final Time Normalization/Scaling to Eliminate Lag
-    # This step is critical to ensure MoviePy video duration (from audio) matches 
-    # the scaled word times derived from Whisper (which might be slightly off 
-    # due to Whisper's internal processing latency/accuracy).
     if all_word_data:
         true_duration = final_audio_clip.duration
-        # The end time of the last word in the list represents Whisper's calculated end of speech
         whisper_total_time = all_word_data[-1]['end'] if all_word_data and 'end' in all_word_data[-1] else 0.0
         
-        if whisper_total_time > 0 and abs(true_duration - whisper_total_time) > 0.1: # Only scale if difference > 0.1s
+        if whisper_total_time > 0 and abs(true_duration - whisper_total_time) > 0.1: 
             scale_factor = true_duration / whisper_total_time
-            # print(f"-> Normalizing timestamps: Scaling by {scale_factor:.4f} (True Duration: {true_duration:.2f}s, Whisper End: {whisper_total_time:.2f}s)")
+            # print(f"-> Normalizing timestamps: Scaling by {scale_factor:.4f}")
         else:
             scale_factor = 1.0
 

@@ -39,14 +39,10 @@ try:
         VIDEO_PADDING_START, VIDEO_PADDING_END, 
         suppress_output,
         # --- NEW IMPORTS ---
-        FOLLOW_ANIMATION_PATH,
-        FOLLOW_TRIGGER_WORD,
-        ANIMATION_DURATION,
-        ANIMATION_Y_POS,
-        ANIMATION_SCALE,
         PIP_DIR,
         PIP_WIDTH,
         PIP_Y_OFFSET,
+        VIDEO_CODEC,
         # -------------------
     )
 except ImportError:
@@ -64,14 +60,10 @@ except ImportError:
         VIDEO_PADDING_START, VIDEO_PADDING_END, 
         suppress_output,
         # --- NEW IMPORTS ---
-        FOLLOW_ANIMATION_PATH,
-        FOLLOW_TRIGGER_WORD,
-        ANIMATION_DURATION,
-        ANIMATION_Y_POS,
-        ANIMATION_SCALE,
         PIP_DIR,
         PIP_WIDTH,
         PIP_Y_OFFSET,
+        VIDEO_CODEC,
         # -------------------
     )
 
@@ -161,82 +153,7 @@ class ReelGenerator:
         
         return text_clips
 
-    # --- MODIFIED METHOD: FOLLOW ANIMATION ---
-    def _create_follow_animation_clip(self, start_time, duration):
-        """
-        Creates an animated clip from the WebP file using PIL for frame extraction
-        and MoviePy's ImageSequenceClip for playback.
-        """
-        if not os.path.exists(FOLLOW_ANIMATION_PATH):
-            print(f"Warning: Follow animation file not found at {FOLLOW_ANIMATION_PATH}. Skipping animation.")
-            return None
 
-        frames = []
-        try:
-            # 1. Open the animated WebP with Pillow
-            img = Image.open(FOLLOW_ANIMATION_PATH)
-            
-            # Use the duration of the first frame if available, otherwise default to 40ms (25fps)
-            frame_duration_ms = img.info.get('duration', 40)
-            fps = 1000 / frame_duration_ms
-            
-            # 2. Extract and store all frames
-            for i in range(img.n_frames):
-                img.seek(i)
-                # Convert frame to RGBA to ensure transparency is preserved
-                frame = img.convert('RGBA')
-                
-                # Resize the frame
-                original_w, original_h = frame.size
-                scaled_w = int(original_w * ANIMATION_SCALE)
-                new_h = int((scaled_w / original_w) * original_h)
-
-                # Use Image.LANCZOS for high-quality resizing
-                frame = frame.resize((scaled_w, new_h), Image.Resampling.LANCZOS)
-
-                # Save the resized frame to an in-memory buffer (bytes)
-                frame_buffer = io.BytesIO()
-                frame.save(frame_buffer, format='PNG')
-                frame_buffer.seek(0)
-                
-                # Append the bytes/path needed for ImageSequenceClip. 
-                # For direct creation from numpy arrays or file paths, we typically use paths, 
-                # but since we are modifying frames in memory, we will collect file paths.
-                # For simplicity and robustness, let's save the resized frames temporarily.
-                
-                temp_frame_path = os.path.join(TEMP_DIR, f"temp_follow_frame_{i}.png")
-                frame.save(temp_frame_path)
-                frames.append(temp_frame_path)
-
-
-            # 3. Create ImageSequenceClip from the sequence of temporary frame paths
-            if not frames:
-                print("Error: Could not extract any frames from the follow animation. Skipping.")
-                return None
-                
-            # Create the clip using the list of temporary files
-            animation_clip = ImageSequenceClip(frames, fps=fps)
-
-        except Exception as e:
-            print(f"Error processing follow animation WebP using Pillow: {e}. Skipping animation.")
-            return None
-
-        # Set the total duration. The sequence will loop if necessary.
-        animation_clip = animation_clip.set_duration(duration)
-        
-        # Set the starting time
-        animation_clip = animation_clip.set_start(start_time)
-        
-        # The size is already set by the resized frames (all frames have the same size)
-        x_pos = (TARGET_W - animation_clip.w) / 2
-        
-        animation_clip = animation_clip.set_pos((x_pos, ANIMATION_Y_POS))
-        
-        # NOTE: Temporary frame files will be cleaned up on the next run or script exit 
-        # when TEMP_DIR is cleaned, which is sufficient.
-
-        return animation_clip
-    # ------------------------------------
 
     def _get_speaker_segments(self, word_data_list):
         """Groups word data into speaker segments (turns)."""
@@ -506,26 +423,9 @@ class ReelGenerator:
             # 6. Create Avatar Clips
             avatar_clips = self._create_avatar_clips(word_data_list)
             
-            # 7. Create Follow Animation Clip(s)
-            follow_animation_clips = []
-            offset = VIDEO_PADDING_START 
-            
-            # Check all words for the trigger
-            for word_data in word_data_list:
-                # Check for the trigger word (case-insensitive)
-                if FOLLOW_TRIGGER_WORD in word_data['word'].lower():
-                    # The animation should start when the word is spoken
-                    start_time = word_data['start'] + offset
-                    
-                    # Create the animation clip with the predefined duration
-                    animation_clip = self._create_follow_animation_clip(start_time, ANIMATION_DURATION)
-                    
-                    if animation_clip:
-                        follow_animation_clips.append(animation_clip)
-                        # If you want it to appear only on the first instance, uncomment the break below
-                        # break 
             
             # 7.5 Create PIP Asset Clip (Optional)
+            offset = VIDEO_PADDING_START
             speaker_segments = self._get_speaker_segments(word_data_list)
             pip_clips = []
             if len(speaker_segments) >= 3:
@@ -567,7 +467,7 @@ class ReelGenerator:
             
             # 9. Compose Final Clip
             final_clip = CompositeVideoClip(
-                [final_video_clip] + text_clips + avatar_clips + follow_animation_clips + pip_clips, # ADDED follow_animation_clips & pip_clips
+                [final_video_clip] + text_clips + avatar_clips + pip_clips, # ADDED follow_animation_clips & pip_clips
                 size=(TARGET_W, TARGET_H)
             )
             final_clip = final_clip.set_audio(final_audio_clip)
@@ -578,7 +478,7 @@ class ReelGenerator:
                 final_clip.write_videofile(
                     self.temp_output_file, 
                     fps=30,
-                    codec="libx264", 
+                    codec=VIDEO_CODEC, 
                     audio_codec="aac",
                     temp_audiofile=os.path.join(TEMP_DIR, 'temp-audio.m4a'),
                     remove_temp=True,
@@ -599,11 +499,7 @@ class ReelGenerator:
         
         finally:
              # Ensure temporary frames from WebP processing are also cleaned up if needed
-             for f in glob.glob(os.path.join(TEMP_DIR, "temp_follow_frame_*.png")):
-                 try:
-                     os.remove(f)
-                 except OSError:
-                     pass # Ignore errors on cleanup
+
              
              if os.path.exists(self.temp_output_file):
                  os.remove(self.temp_output_file)

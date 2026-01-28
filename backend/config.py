@@ -16,13 +16,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
 
-# --- NEW FOLLOW ANIMATION CONFIGURATION ---
-FOLLOW_ANIMATION_PATH = os.path.join(DATA_DIR, "assets", "follow_animation", "follow animation.webp")
-FOLLOW_TRIGGER_WORD = "follow" # The word that triggers the animation
-ANIMATION_DURATION = 1.0       # Duration (in seconds) the animation should play for
-ANIMATION_Y_POS = 100          # Y position for the animation on screen
-ANIMATION_SCALE = 0.5          # Scale factor for the animation
-# -----------------------------------------
+
 
 # --- PIP ASSET CONFIGURATION ---
 PIP_DIR = os.path.join(DATA_DIR, "assets", "pip")
@@ -82,6 +76,22 @@ STROKE_WIDTH = 3
 CAPTION_POSITION = 'center' 
 BOUNCE_SCALE_MAX = 1.20
 MIN_CLIP_DURATION = 0.04 
+
+# --- PLATFORM DETECTION ---
+import platform
+IS_MAC = platform.system() == 'Darwin'
+
+# --- HARDWARE ACCELERATION CONFIGURATION ---
+if IS_MAC:
+    # Use h264_videotoolbox for macOS hardware acceleration
+    VIDEO_CODEC = "h264_videotoolbox" 
+    # Use mps for macOS GPU acceleration in Whisper
+    WHISPER_DEVICE = "mps" 
+else:
+    # Linux/Windows configuration
+    VIDEO_CODEC = "libx264"
+    # Use cpu or cuda if available (defaulting to cpu for safety, user can change if they have nvidia)
+    WHISPER_DEVICE = "cpu" 
 
 # --- AVATAR DISPLAY CONFIGURATION ---
 AVATAR_WIDTH = 800 

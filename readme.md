@@ -1,136 +1,103 @@
-# Faceless Reel Automation Project
+# Faceless Reel Generator
 
-![Project Banner](misc/image.png)
+An automated tool to generate video reels using AI-generated content, complete with voiceovers, subtitles, and background videos.
 
-This project is a full-stack application designed to automate the creation of vertical (9:16) short-form videos, like Instagram Reels or TikToks. It features a web-based interface to generate content from scripts, convert text-to-speech (TTS) with multiple voice options, and combine it with animated captions over a background video.
+## Prerequisites
 
-The application is containerized with Docker for easy setup and deployment, and includes a Python backend powered by FastAPI and a Next.js frontend.
+- **Python**: Version 3.12 or higher.
+- **Package Manager**: [uv](https://github.com/astral-sh/uv) (Recommended for faster dependency management) or `pip`.
+- **System Tools**:
+  - `FFmpeg`: Required for video processing.
+  - `ImageMagick`: Required for generating text captions on videos.
 
----
+## Installation
 
-## Features
+### macOS
 
-*   **Web Interface:** A user-friendly UI built with Next.js to manage content, characters, and video generation.
-*   **Multiple TTS Providers:** Supports various text-to-speech services, including Google's Gemini, ElevenLabs, and macOS's native `say` command.
-*   **Dockerized Environment:** Comes with a `docker-compose.yml` for a one-command setup of both the frontend and backend services.
-*   **Customizable Characters:** Define characters with unique voices and avatars through a simple `characters.json` file.
-*   **Dynamic Content Generation:** Use prompts to generate dialogue scripts for your videos.
-*   **Precise Caption Sync:** Utilizes `whisper-timestamped` for millisecond-accurate, word-level synchronization of captions.
-*   **Animated Captions:** Captions feature a subtle bounce animation synchronized with the audio.
-*   **Telegram Bot Integration:** A simple bot to retrieve the local IP address for easy access to the web UI on your network.
+1.  **Install System Dependencies** (using [Homebrew](https://brew.sh/)):
 
----
-
-## Tech Stack
-
-*   **Backend:** Python, FastAPI, MoviePy, Whisper
-*   **Frontend:** Next.js, React, Tailwind CSS
-*   **Services:** Docker, FFmpeg
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-*   [Git](https://git-scm.com/)
-*   [Docker](https://www.docker.com/get-started) and [Docker Compose](https://docs.docker.com/compose/install/)
-*   [Node.js](https://nodejs.org/) (for local development)
-*   [Python 3.10+](https://www.python.org/) (for local development)
-*   [FFmpeg](https://ffmpeg.org/download.html) (for local development)
-
-### Docker Setup (Recommended)
-
-1.  **Clone the repository:**
     ```bash
-    git clone <repository-url>
+    brew install ffmpeg imagemagick
+    ```
+
+    _Note: If you run into issues with ImageMagick and moviepy, ensure the `MAGICK_HOME` environment variable is set or that `convert` / `magick` is in your PATH._
+
+2.  **Install `uv` (Optional but Recommended)**:
+    ```bash
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    ```
+
+### Linux (Fedora)
+
+1.  **Install System Dependencies**:
+    You may need to enable RPM Fusion repositories for FFmpeg if not already enabled.
+
+    ```bash
+    sudo dnf install ffmpeg ImageMagick
+    ```
+
+    To ensure you have necessary headers for building Python packages (like Pillow or others if wheels are unavailable):
+
+    ```bash
+    sudo dnf groupinstall "Development Tools"
+    sudo dnf install python3-devel libjpeg-devel zlib-devel
+    ```
+
+    _Note: Depending on your Fedora version, `ImageMagick` might be named `ImageMagick-devel` if you need development headers, but the binary is usually sufficient for MoviePy._
+
+2.  **Install `uv` (Optional but Recommended)**:
+    ```bash
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    ```
+
+## Setup
+
+1.  **Clone the Repository**:
+
+    ```bash
+    git clone <repository_url>
     cd faceless_project
     ```
 
-2.  **Create a `.env` file:**
-    Create a `.env` file in the root of the project and add your API keys:
-    ```env
-    ELEVEN_API="your_elevenlabs_api_key"
-    GEMINI_API_KEY="your_gemini_api_key"
-    TELEGRAM_BOT="your_telegram_bot_token"
+2.  **Environment Configuration**:
+    Create a `.env` file in the root directory. You can use the example below or copy from a provided template if available.
+
+    **Required Variables**:
+
+    ```ini
+    ELEVEN_API=your_elevenlabs_api_key
+    GEMINI_API_KEY=your_gemini_api_key
     ```
 
-3.  **Build and run with Docker Compose:**
+    _Add other keys as found in `backend/config.py` if necessary._
+
+3.  **Install Python Dependencies**:
+    Using `uv`:
     ```bash
-    docker-compose up --build
+    uv pip install -r requirements.txt
     ```
-    The web interface will be available at [http://localhost:3000](http://localhost:3000).
-
-### Local Development
-
-1.  **Backend Setup:**
+    Or using `pip`:
     ```bash
     pip install -r requirements.txt
     ```
 
-2.  **Frontend Setup:**
-    ```bash
-    cd web_app
-    npm install
-    ```
-
-3.  **Run the application:**
-    From the root directory, run:
-    ```bash
-    python3 main.py
-    ```
-    This will start the FastAPI backend, the Next.js development server, and the Telegram bot.
-
----
-
-## Project Structure
-
-```
-.
-├── assets/
-│   ├── avatars/
-│   └── bg_videos/
-├── contents/
-│   └── captions/
-├── processors/
-├── services/
-├── web_app/
-│   ├── app/
-│   └── components/
-├── config.py
-├── characters.json
-├── docker-compose.yml
-├── main.py
-├── server.py
-└── telegram_bot.py
-```
-
----
-
-## Configuration
-
-*   **`config.py`**: Main configuration file for Python services. Here you can set paths, video styles, and TTS settings.
-*   **`characters.json`**: Define the characters for your videos. Each character can have a name, a voice (mapped to a TTS service), and an avatar.
-*   **`.env`**: For storing API keys and other secrets.
-
----
-
 ## Usage
 
-### Web Interface
+To start the application:
 
-Access the web UI at [http://localhost:3000](http://localhost:3000). From here you can:
-*   Generate new video scripts.
-*   Select characters and a TTS service.
-*   Generate reels from your scripts.
-*   View and download previously generated reels.
+```bash
+uv run run.py
+```
 
-### Telegram Bot
+_Or if using standard pip:_
 
-The Telegram bot is configured to respond to the command `ip` with the local IP address of the machine running the application. This is useful for accessing the web UI from other devices on the same network.
+```bash
+python run.py
+```
 
----
+The application will start, and you see the output indicating the local URL (usually `http://0.0.0.0:8008` or similar).
 
-## Contributing
+## Notes
 
-Contributions are welcome! Please feel free to submit a pull request.
+- **Policy**: The `ImageMagick` security policy might block the use of the `@` symbol (needed for reading text files). If you encounter errors, you may need to edit `/etc/ImageMagick-6/policy.xml` (location varies) to allow reading text files.
+- **Font**: Ensure the font specified in `backend/config.py` exists, or the script may fail or fallback to a default font.

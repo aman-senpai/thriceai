@@ -1,3 +1,7 @@
+import warnings
+# Filter out MoviePy syntax warnings on Python 3.12+
+warnings.filterwarnings("ignore", category=SyntaxWarning, module="moviepy")
+
 import sys
 import os
 

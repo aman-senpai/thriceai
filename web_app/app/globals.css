@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Tailwind v4: Enable class-based dark mode */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Custom Scrollbar Styling */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
@@ -41,5 +44,22 @@
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.3s ease-out forwards;
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+/* Horizontal scrollbar for character picker */
+.custom-scrollbar::-webkit-scrollbar {
+  height: 4px;
+}
+
+/* Hide scrollbar on mobile for cleaner look */
+@media (max-width: 768px) {
+  .custom-scrollbar::-webkit-scrollbar {
+    height: 2px;
+  }
+}
+
+/* Active button press effect */
+button:active:not(:disabled) {
+  transform: scale(0.98);
 }

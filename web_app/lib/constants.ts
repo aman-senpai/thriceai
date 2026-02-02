@@ -67,8 +67,11 @@ export const postData = async (endpoint: string, payload: any) => {
     formData.append("selected_prompt_path", payload.selected_prompt_path);
     formData.append("query", payload.query);
     formData.append("file_name", payload.file_name);
-  } else if (endpoint.includes("reels") && payload.audio_mode) {
+  } else if (endpoint.includes("reel") && payload.audio_mode) {
     formData.append("audio_mode", payload.audio_mode);
+    if (payload.filename) {
+      formData.append("filename", payload.filename);
+    }
   } else if (endpoint.includes("update-content")) {
     formData.append("file_name", payload.file_name);
     formData.append("content", payload.content);

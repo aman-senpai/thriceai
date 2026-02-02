@@ -73,26 +73,36 @@ An automated tool to generate video reels using AI-generated content, complete w
 
 3.  **Install Python Dependencies**:
     Using `uv`:
+
     ```bash
-    uv pip install -r requirements.txt
+    uv sync
     ```
+
     Or using `pip`:
+
     ```bash
-    pip install -r requirements.txt
+    pip install -e .
+    ```
+
+4.  **Setup Frontend**:
+    ```bash
+    cd web_app
+    bun install
     ```
 
 ## Usage
 
-To start the application:
+To start the backend:
 
 ```bash
 uv run run.py
 ```
 
-_Or if using standard pip:_
+To start the frontend:
 
 ```bash
-python run.py
+cd web_app
+bun run dev
 ```
 
 The application will start, and you see the output indicating the local URL (usually `http://0.0.0.0:8008` or similar).

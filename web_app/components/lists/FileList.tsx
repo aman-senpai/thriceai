@@ -10,6 +10,9 @@ interface FileListProps {
     showPreviewModal?: (url: string) => void;
     showDialogueModal?: (item: ContentItem) => void;
     handleCaptionGeneration?: (contentFileName: string) => Promise<void>;
+    handleSingleReelGeneration?: (contentFileName: string) => Promise<void>;
+    handleDeleteScript?: (filename: string) => Promise<void>;
+    handleDeleteReel?: (filename: string) => Promise<void>;
     isContentGenerating?: boolean;
     isReelGenerating?: boolean;
     refreshLists: () => Promise<void>;
@@ -23,7 +26,8 @@ const formatTimestamp = (ms: number) => {
 
 export const FileList: React.FC<FileListProps> = ({
     title, data, isLoading, isContentList,
-    showPreviewModal, showDialogueModal, handleCaptionGeneration,
+    showPreviewModal, showDialogueModal, handleCaptionGeneration, handleSingleReelGeneration,
+    handleDeleteScript, handleDeleteReel,
     isContentGenerating = false, isReelGenerating = false, refreshLists, apiBaseUrl
 }) => {
     const isGenerating = isContentGenerating || isReelGenerating;
@@ -87,12 +91,28 @@ export const FileList: React.FC<FileListProps> = ({
                                             <i className="fas fa-closed-captioning"></i>
                                         </button>
                                         <button
+                                            onClick={() => handleSingleReelGeneration?.(item.name)}
+                                            className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition"
+                                            title="Generate Reel"
+                                            disabled={isGenerating}
+                                        >
+                                            <i className="fas fa-film"></i>
+                                        </button>
+                                        <button
                                             onClick={() => showDialogueModal?.(item as ContentItem)}
                                             className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition"
                                             title="Edit Dialogue"
                                             disabled={isGenerating}
                                         >
                                             <i className="fas fa-pencil-alt"></i>
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteScript?.(item.name)}
+                                            className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition"
+                                            title="Delete Script"
+                                            disabled={isGenerating}
+                                        >
+                                            <i className="fas fa-trash"></i>
                                         </button>
                                     </>
                                 ) : (
@@ -112,6 +132,14 @@ export const FileList: React.FC<FileListProps> = ({
                                             disabled={isGenerating}
                                         >
                                             <i className="fas fa-play"></i>
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteReel?.(item.name)}
+                                            className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition"
+                                            title="Delete Reel"
+                                            disabled={isGenerating}
+                                        >
+                                            <i className="fas fa-trash"></i>
                                         </button>
                                     </>
                                 )}

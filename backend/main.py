@@ -35,7 +35,7 @@ warnings.filterwarnings(
 # --- CONFIGURATION ---
 FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'web_app'))
 
-FRONTEND_COMMAND = ["npm", "run", "dev"]
+FRONTEND_COMMAND = ["bun", "run", "dev"]
 FRONTEND_URL = "http://localhost:3031"
 BACKEND_URL = "http://127.0.0.1:8008"
 
@@ -120,20 +120,80 @@ def run_web_ui():
     # Give services a moment to start
     time.sleep(2) 
 
-    # 4. Start the Backend (this is the blocking call that keeps the script alive)
+    # 4. Start the Backend in a separate thread so we can listen for keyboard input
     print("\n" + "-"*50)
     print(f"📦 Starting FastAPI Backend...")
     print(f"Backend API URL: {BACKEND_URL}")
-    print("-"*-50)
+    print("-"*50)
+    print("\n" + "="*50)
+    print("💡 Press 's' + Enter to stop all services")
+    print("="*50 + "\n")
     
-    server.run_server()
+    import threading
+    
+    # Event to signal shutdown
+    shutdown_event = threading.Event()
+    
+    def run_server_thread():
+        """Run the uvicorn server in a thread."""
+        import uvicorn
+        from fastapi.middleware.cors import CORSMiddleware
+        
+        # Add CORS middleware
+        server.app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+        
+        config = uvicorn.Config(server.app, host="0.0.0.0", port=8008, log_level="info")
+        server_instance = uvicorn.Server(config)
+        
+        # Store server reference for shutdown
+        run_server_thread.server = server_instance
+        server_instance.run()
+    
+    # Start server in a thread
+    server_thread = threading.Thread(target=run_server_thread, daemon=True)
+    server_thread.start()
+    
+    # Listen for keyboard input to stop
+    try:
+        while True:
+            user_input = input().strip().lower()
+            if user_input == 's':
+                print("\n" + "="*50)
+                print("🛑 Stopping all services...")
+                print("="*50)
+                break
+    except (KeyboardInterrupt, EOFError):
+        print("\n🛑 Interrupt received, stopping...")
+    
+    # Shutdown sequence
+    print("   ↳ Stopping FastAPI server...")
+    if hasattr(run_server_thread, 'server'):
+        run_server_thread.server.should_exit = True
+    
+    print("   ↳ Stopping Telegram bot...")
+    if bot_process.is_alive():
+        bot_process.terminate()
+        bot_process.join(timeout=2)
+    
+    print("   ↳ Stopping Frontend...")
+    if frontend_process.is_alive():
+        frontend_process.terminate()
+        frontend_process.join(timeout=2)
+    
+    # Kill any remaining processes on ports
+    kill_port_processes([8008, 3031])
+    
+    # Cleanup
+    cleanup_temp_dir()
+    print("\n✅ All services stopped. Goodbye!\n")
+
 
 if __name__ == "__main__":
     multiprocessing.freeze_support() 
-    try:
-        run_web_ui()
-    except KeyboardInterrupt:
-        print("\nProgram interrupted by user (Ctrl+C). Cleaning up...")
-        cleanup_temp_dir()
-    finally:
-        print("Program finished.")
+    run_web_ui()

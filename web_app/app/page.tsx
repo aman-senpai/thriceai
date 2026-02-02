@@ -88,34 +88,57 @@ interface HeaderProps {
   isContentsLoading: boolean;
   isDark: boolean;
   toggleTheme: () => void;
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
 }
 
-const Header = ({ refreshLists, isReelGenerating, isContentGenerating, isReelsLoading, isContentsLoading, isDark, toggleTheme }: HeaderProps) => (
-  <header className="flex justify-between items-center mb-2 px-1 shrink-0">
-    <div className="flex items-center gap-3">
-      <h1 className="text-xl font-black tracking-tight text-zinc-900 dark:text-white">
-        Reel Generator
-      </h1>
-      <div className="h-4 w-px bg-zinc-300 dark:bg-zinc-700"></div>
-      <p className="text-xs text-zinc-500 font-medium hidden sm:block">Create engaging conversations in seconds.</p>
+const Header = ({ refreshLists, isReelGenerating, isContentGenerating, isReelsLoading, isContentsLoading, isDark, toggleTheme, activeTab, setActiveTab }: HeaderProps) => (
+  <header className="sticky top-0 z-50 bg-zinc-50/95 dark:bg-zinc-950/95 backdrop-blur-sm border-b border-zinc-200 dark:border-zinc-800 px-3 py-2 md:px-4 md:py-3 shrink-0">
+    <div className="flex justify-between items-center">
+      <div className="flex items-center gap-2">
+        <h1 className="text-lg md:text-xl font-black tracking-tight text-zinc-900 dark:text-white">
+          Reel Gen
+        </h1>
+        <p className="text-[10px] md:text-xs text-zinc-500 font-medium hidden sm:block">Create content fast.</p>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={toggleTheme}
+          className="w-10 h-10 md:w-9 md:h-9 flex items-center justify-center rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition shadow-sm active:scale-95"
+          title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+        >
+          <i className={`fas ${isDark ? "fa-sun" : "fa-moon"} text-base md:text-sm`}></i>
+        </button>
+        <button
+          onClick={refreshLists}
+          disabled={isReelGenerating || isContentGenerating}
+          className="w-10 h-10 md:w-9 md:h-9 flex items-center justify-center rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition shadow-sm active:scale-95 disabled:opacity-50"
+          title="Refresh Lists"
+        >
+          <i className={`fas fa-sync text-base md:text-sm ${isReelsLoading || isContentsLoading ? "animate-spin" : ""}`}></i>
+        </button>
+      </div>
     </div>
-    <div className="flex items-center gap-2">
-      <button
-        onClick={toggleTheme}
-        className="p-1.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition shadow-sm"
-        title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-      >
-        <i className={`fas ${isDark ? "fa-sun" : "fa-moon"} text-sm`}></i>
-      </button>
-      <button
-        onClick={refreshLists}
-        disabled={isReelGenerating || isContentGenerating}
-        className="p-1.5 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition shadow-sm"
-        title="Refresh Lists"
-      >
-        <i className={`fas fa-sync text-sm ${isReelsLoading || isContentsLoading ? "animate-spin" : ""}`}></i>
-      </button>
-    </div>
+    {/* Mobile Tab Navigation */}
+    <nav className="flex gap-1 mt-2 md:hidden">
+      {[
+        { id: 'studio', label: 'Studio', icon: 'fa-feather' },
+        { id: 'files', label: 'Files', icon: 'fa-folder' },
+        { id: 'log', label: 'Log', icon: 'fa-terminal' },
+      ].map((tab) => (
+        <button
+          key={tab.id}
+          onClick={() => setActiveTab(tab.id)}
+          className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${activeTab === tab.id
+            ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-sm'
+            : 'bg-white dark:bg-zinc-900 text-zinc-500 border border-zinc-200 dark:border-zinc-800'
+            }`}
+        >
+          <i className={`fas ${tab.icon}`}></i>
+          {tab.label}
+        </button>
+      ))}
+    </nav>
   </header>
 );
 interface GenerateContentFormProps {
@@ -154,49 +177,46 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
 
 
 
-  // Helper for Character Cards
-  const CharacterGrid = ({ label, selected, onSelect, exclude }: { label: string, selected: string, onSelect: (v: string) => void, exclude?: string }) => (
-    <div className="space-y-3">
-      <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest px-1 flex justify-between">
-        {selected && <span className="text-zinc-900 dark:text-white font-black">{selected}</span>}
-      </label>
-      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 p-1">
+  // Helper for Character Cards - Compact Horizontal Scroll
+  const CharacterScroll = ({ label, selected, onSelect, exclude }: { label: string, selected: string, onSelect: (v: string) => void, exclude?: string }) => (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between px-1">
+        <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{label}</label>
+        {selected && <span className="text-xs text-zinc-900 dark:text-white font-bold">{selected}</span>}
+      </div>
+      <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar -mx-1 px-1">
         {config && Object.entries(config.characters).map(([key, char]) => {
           const isSelected = selected === key;
           const isExcluded = exclude === key;
-          const styles = isSelected
-            ? "ring-2 ring-zinc-900 dark:ring-white scale-[1.02] shadow-lg opacity-100"
-            : "opacity-60 hover:opacity-100 hover:scale-[1.02] grayscale hover:grayscale-0";
 
           if (isExcluded) return null;
 
           return (
-            <div
+            <button
               key={key}
+              type="button"
               onClick={() => (!isExcluded && !isContentGenerating) && onSelect(key)}
-              className={`relative cursor-pointer rounded-xl overflow-hidden aspect-square transition-all duration-300 group ${styles} ${isExcluded ? "hidden" : ""}`}
+              className={`relative shrink-0 w-14 h-14 md:w-16 md:h-16 rounded-xl overflow-hidden transition-all duration-200 ${isSelected
+                ? "ring-2 ring-zinc-900 dark:ring-white shadow-lg scale-105"
+                : "opacity-70 hover:opacity-100 hover:scale-105 grayscale hover:grayscale-0"
+                }`}
             >
               <img
                 src={char.avatar.startsWith('http') ? char.avatar : `${API_BASE_URL}${char.avatar}`}
                 alt={key}
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                className="w-full h-full object-cover"
                 loading="lazy"
                 onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${key}&background=random`; }}
               />
-
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent p-3 flex flex-col justify-end">
-                <p className="text-white font-bold text-lg leading-none tracking-tight">{key}</p>
-                <p className="text-zinc-300 text-[10px] uppercase tracking-wider font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
-                  {config.characters[key]?.voice_gemini || "AI Voice"}
-                </p>
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent py-1 px-1">
+                <p className="text-white font-bold text-[9px] leading-none truncate text-center">{key}</p>
               </div>
-
               {isSelected && (
-                <div className="absolute top-2 right-2 w-6 h-6 bg-white dark:bg-zinc-900 rounded-full flex items-center justify-center shadow-sm">
-                  <i className="fas fa-check text-xs text-zinc-900 dark:text-white"></i>
+                <div className="absolute top-1 right-1 w-4 h-4 bg-white dark:bg-zinc-900 rounded-full flex items-center justify-center shadow">
+                  <i className="fas fa-check text-[8px] text-zinc-900 dark:text-white"></i>
                 </div>
               )}
-            </div>
+            </button>
           );
         })}
       </div>
@@ -299,15 +319,15 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
           </div>
         </div>
 
-        {/* Character Selection Grid (Moved to Bottom & Scrollable) */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0 pr-1 space-y-2 pt-2 border-t border-zinc-100 dark:border-zinc-800/50">
-          <CharacterGrid label="Speaker 1" selected={charA} onSelect={setCharA} exclude={charB} />
-          <div className="flex items-center gap-4 opacity-50">
-            <div className="h-px bg-zinc-200 dark:bg-zinc-800 flex-1"></div>
-            <span className="text-[10px] font-black text-zinc-300 uppercase">VS</span>
-            <div className="h-px bg-zinc-200 dark:bg-zinc-800 flex-1"></div>
+        {/* Character Selection - Compact Horizontal Scroll */}
+        <div className="space-y-2 pt-2 border-t border-zinc-100 dark:border-zinc-800/50">
+          <CharacterScroll label="Speaker 1" selected={charA} onSelect={setCharA} exclude={charB} />
+          <div className="flex items-center gap-3 px-1">
+            <div className="h-px bg-zinc-200 dark:bg-zinc-700 flex-1"></div>
+            <span className="text-[9px] font-black text-zinc-400 uppercase">vs</span>
+            <div className="h-px bg-zinc-200 dark:bg-zinc-700 flex-1"></div>
           </div>
-          <CharacterGrid label="Speaker 2" selected={charB} onSelect={setCharB} exclude={charA} />
+          <CharacterScroll label="Speaker 2" selected={charB} onSelect={setCharB} exclude={charA} />
         </div>
 
       </form>
@@ -466,6 +486,7 @@ export default function Page() {
   const [contentStatus, setContentStatus] = useState("");
   const [reelStatus, setReelStatus] = useState("");
   const [mounted, setMounted] = useState(false);
+  const [activeTab, setActiveTab] = useState('studio'); // Mobile tab navigation
 
   const [isConfigLoading, setIsConfigLoading] = useState(false);
   const [isReelsLoading, setIsReelsLoading] = useState(false);
@@ -508,7 +529,10 @@ export default function Page() {
       setCharA(charKeys[0] || "");
       setCharB(charKeys[1] || "");
       setAudioMode(modeKeys[0] || "");
-      setPromptPath(promptKeys[0] || "");
+
+      // Default to blinked_thrice.txt if available, otherwise first prompt
+      const defaultPrompt = promptKeys.find(key => key.includes("blinked_thrice.txt")) || promptKeys[0] || "";
+      setPromptPath(defaultPrompt);
 
       log("Configuration loaded successfully.", "success");
     } catch (err: any) {
@@ -551,6 +575,47 @@ export default function Page() {
     refreshLists();
     fetchPipAsset();
   }, [loadConfig, refreshLists, fetchPipAsset]);
+
+  // --- SSE Connection for Terminal Logs ---
+  useEffect(() => {
+    let eventSource: EventSource | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+
+    const connectToLogStream = () => {
+      eventSource = new EventSource(`${API_BASE_URL}/api/logs/stream`);
+
+      eventSource.onmessage = (event) => {
+        try {
+          const logEntry = JSON.parse(event.data) as LogMessage;
+          setLogMessages((prev) => {
+            // Avoid duplicates by checking if message already exists
+            const isDuplicate = prev.some(
+              (l) => l.timestamp === logEntry.timestamp && l.message === logEntry.message
+            );
+            if (isDuplicate) return prev;
+            return [...prev.slice(-500), logEntry];
+          });
+        } catch (err) {
+          console.error("Failed to parse log message:", err);
+        }
+      };
+
+      eventSource.onerror = () => {
+        eventSource?.close();
+        // Attempt to reconnect after 5 seconds
+        reconnectTimeout = setTimeout(connectToLogStream, 5000);
+      };
+    };
+
+    // Start connection after a short delay to let the server start
+    const initialTimeout = setTimeout(connectToLogStream, 1000);
+
+    return () => {
+      clearTimeout(initialTimeout);
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      eventSource?.close();
+    };
+  }, []);
 
   const isConfigValid = useMemo(
     () =>
@@ -650,6 +715,30 @@ export default function Page() {
     }
   };
 
+  const handleSingleReelGeneration = async (filename: string) => {
+    const endpoint = "/api/generate-reel/single";
+
+    if (isReelGenerating || !audioMode) {
+      log("Cannot generate: either already generating or no audio mode selected.", "warn");
+      return;
+    }
+    setIsReelGenerating(true);
+    setReelStatus(`Processing ${filename}...`);
+    log(`Generating reel for ${filename}...`, "info");
+    try {
+      const result = await postData(endpoint, { filename, audio_mode: audioMode });
+      setReelStatus("✅ " + result.message);
+      log(result.message, "success");
+      refreshLists();
+    } catch (err: any) {
+      const errorMsg = err.message || 'API call failed.';
+      setReelStatus("❌ " + errorMsg);
+      log(errorMsg, "error");
+    } finally {
+      setIsReelGenerating(false);
+    }
+  };
+
   const handlePipUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -685,6 +774,43 @@ export default function Page() {
       log("PIP asset cleared.", "success");
     } catch (err: any) {
       log(`Failed to clear asset: ${err.message}`, "error");
+    }
+  };
+
+  const handleDeleteScript = async (filename: string) => {
+    if (!confirm(`Delete script "${filename}"? This cannot be undone.`)) return;
+
+    log(`Deleting script: ${filename}...`, "info");
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/delete-script/${filename}`, { method: "DELETE" });
+      const result = await response.json();
+      if (response.ok) {
+        log(result.message, "success");
+        setSessionCount(result.session_count ?? sessionCount);
+        refreshLists();
+      } else {
+        throw new Error(result.detail || "Delete failed");
+      }
+    } catch (err: any) {
+      log(`Failed to delete script: ${err.message}`, "error");
+    }
+  };
+
+  const handleDeleteReel = async (filename: string) => {
+    if (!confirm(`Delete reel "${filename}"? This cannot be undone.`)) return;
+
+    log(`Deleting reel: ${filename}...`, "info");
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/delete-reel/${filename}`, { method: "DELETE" });
+      const result = await response.json();
+      if (response.ok) {
+        log(result.message, "success");
+        refreshLists();
+      } else {
+        throw new Error(result.detail || "Delete failed");
+      }
+    } catch (err: any) {
+      log(`Failed to delete reel: ${err.message}`, "error");
     }
   };
 
@@ -788,98 +914,172 @@ export default function Page() {
   if (!mounted) return null;
 
   return (
-    <div className="transition-colors duration-600 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-200 min-h-screen flex flex-col md:h-screen md:overflow-hidden">
-      <div className="flex-1 w-full max-w-[1920px] mx-auto p-2 flex flex-col h-full overflow-hidden">
-        <Header
-          refreshLists={refreshLists}
-          isReelGenerating={isReelGenerating}
-          isContentGenerating={isContentGenerating}
-          isReelsLoading={isReelsLoading}
-          isContentsLoading={isContentsLoading}
-          isDark={isDark}
-          toggleTheme={toggleTheme}
-        />
+    <div className="transition-colors duration-300 bg-zinc-100 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-200 min-h-screen flex flex-col">
+      <Header
+        refreshLists={refreshLists}
+        isReelGenerating={isReelGenerating}
+        isContentGenerating={isContentGenerating}
+        isReelsLoading={isReelsLoading}
+        isContentsLoading={isContentsLoading}
+        isDark={isDark}
+        toggleTheme={toggleTheme}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+      />
 
-        <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0 overflow-y-auto md:overflow-hidden">
+      {/* Mobile Layout - Tab Content */}
+      <main className="flex-1 p-2 md:hidden overflow-y-auto">
+        {activeTab === 'studio' && (
+          <div className="space-y-3 animate-fade-in">
+            <GenerateContentForm
+              config={config}
+              charA={charA} setCharA={setCharA}
+              charB={charB} setCharB={setCharB}
+              audioMode={audioMode} setAudioMode={setAudioMode}
+              promptPath={promptPath} setPromptPath={setPromptPath}
+              query={query}
+              handleQueryChange={handleQueryChange}
+              fileName={fileName}
+              handleFileNameChange={handleFileNameChange}
+              contentStatus={contentStatus}
+              isConfigLoading={isConfigLoading}
+              isContentGenerating={isContentGenerating}
+              isConfigValid={isConfigValid}
+              handleContentGeneration={handleContentGeneration}
+            />
+            <ReelGenerationSection
+              handleSessionReelGeneration={handleSessionReelGeneration}
+              handleAllReelGeneration={handleAllReelGeneration}
+              isReelGenerating={isReelGenerating}
+              sessionCount={sessionCount}
+              audioMode={audioMode}
+              reelStatus={reelStatus}
+              config={config}
+              pipAsset={pipAsset}
+              isPipUploading={isPipUploading}
+              handlePipUpload={handlePipUpload}
+              handleClearPipAsset={handleClearPipAsset}
+            />
+          </div>
+        )}
+        {activeTab === 'files' && (
+          <div className="space-y-3 animate-fade-in">
+            <FileList
+              title="Generated Scripts"
+              data={contents}
+              isLoading={isContentsLoading}
+              isContentList={true}
+              showDialogueModal={showDialogueModal}
+              handleCaptionGeneration={handleCaptionGeneration}
+              handleSingleReelGeneration={handleSingleReelGeneration}
+              handleDeleteScript={handleDeleteScript}
+              isReelGenerating={isReelGenerating}
+              apiBaseUrl={API_BASE_URL}
+              refreshLists={refreshLists}
+            />
+            <FileList
+              title="Ready Reels"
+              data={reels}
+              isLoading={isReelsLoading}
+              isContentList={false}
+              showPreviewModal={showPreviewModal}
+              handleDeleteReel={handleDeleteReel}
+              isReelGenerating={isReelGenerating}
+              apiBaseUrl={API_BASE_URL}
+              refreshLists={refreshLists}
+            />
+          </div>
+        )}
+        {activeTab === 'log' && (
+          <div className="h-full animate-fade-in">
+            <LogSection
+              logMessages={logMessages}
+              refreshLists={refreshLists}
+            />
+          </div>
+        )}
+      </main>
 
-          <section className="lg:col-span-6 flex flex-col gap-4 min-h-0 md:h-full">
-            <div className="flex-1 min-h-0 flex flex-col">
-              <GenerateContentForm
-                config={config}
-                charA={charA} setCharA={setCharA}
-                charB={charB} setCharB={setCharB}
-                audioMode={audioMode} setAudioMode={setAudioMode}
-                promptPath={promptPath} setPromptPath={setPromptPath}
-                query={query}
-                handleQueryChange={handleQueryChange}
-                fileName={fileName}
-                handleFileNameChange={handleFileNameChange}
-                contentStatus={contentStatus}
-                isConfigLoading={isConfigLoading}
-                isContentGenerating={isContentGenerating}
-                isConfigValid={isConfigValid}
-                handleContentGeneration={handleContentGeneration}
-              />
-            </div>
-            {/* Build Reels (Fixed at Bottom of Left Col) */}
-            <div className="shrink-0">
-              <ReelGenerationSection
-                handleSessionReelGeneration={handleSessionReelGeneration}
-                handleAllReelGeneration={handleAllReelGeneration}
-                isReelGenerating={isReelGenerating}
-                sessionCount={sessionCount}
-                audioMode={audioMode}
-                reelStatus={reelStatus}
-                config={config}
-                pipAsset={pipAsset}
-                isPipUploading={isPipUploading}
-                handlePipUpload={handlePipUpload}
-                handleClearPipAsset={handleClearPipAsset}
-              />
-            </div>
-          </section>
+      {/* Desktop Layout - 3 Column Grid */}
+      <main className="hidden md:flex flex-1 p-3 lg:p-4 gap-3 lg:gap-4 min-h-0 overflow-hidden max-w-[1920px] mx-auto w-full">
 
-          {/* Column 2: Logs & Output (Right) */}
-          <section className="lg:col-span-6 flex flex-col gap-4 min-h-0 md:h-full">
+        {/* Column 1: Studio/Script (Left) */}
+        <section className="w-[38%] lg:w-[35%] flex flex-col gap-3 min-h-0 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <GenerateContentForm
+              config={config}
+              charA={charA} setCharA={setCharA}
+              charB={charB} setCharB={setCharB}
+              audioMode={audioMode} setAudioMode={setAudioMode}
+              promptPath={promptPath} setPromptPath={setPromptPath}
+              query={query}
+              handleQueryChange={handleQueryChange}
+              fileName={fileName}
+              handleFileNameChange={handleFileNameChange}
+              contentStatus={contentStatus}
+              isConfigLoading={isConfigLoading}
+              isContentGenerating={isContentGenerating}
+              isConfigValid={isConfigValid}
+              handleContentGeneration={handleContentGeneration}
+            />
+          </div>
+          <div className="shrink-0">
+            <ReelGenerationSection
+              handleSessionReelGeneration={handleSessionReelGeneration}
+              handleAllReelGeneration={handleAllReelGeneration}
+              isReelGenerating={isReelGenerating}
+              sessionCount={sessionCount}
+              audioMode={audioMode}
+              reelStatus={reelStatus}
+              config={config}
+              pipAsset={pipAsset}
+              isPipUploading={isPipUploading}
+              handlePipUpload={handlePipUpload}
+              handleClearPipAsset={handleClearPipAsset}
+            />
+          </div>
+        </section>
 
-            {/* Row 1: Activity Log (Fixed Height) */}
-            <div className="h-[120px] shrink-0">
-              <LogSection
-                logMessages={logMessages}
-                refreshLists={refreshLists}
-              />
-            </div>
+        {/* Column 2: File Lists (Center) */}
+        <section className="w-[32%] lg:w-[35%] flex flex-col gap-3 min-h-0 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <FileList
+              title="Generated Scripts"
+              data={contents}
+              isLoading={isContentsLoading}
+              isContentList={true}
+              showDialogueModal={showDialogueModal}
+              handleCaptionGeneration={handleCaptionGeneration}
+              handleSingleReelGeneration={handleSingleReelGeneration}
+              handleDeleteScript={handleDeleteScript}
+              isReelGenerating={isReelGenerating}
+              apiBaseUrl={API_BASE_URL}
+              refreshLists={refreshLists}
+            />
+          </div>
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <FileList
+              title="Ready Reels"
+              data={reels}
+              isLoading={isReelsLoading}
+              isContentList={false}
+              showPreviewModal={showPreviewModal}
+              handleDeleteReel={handleDeleteReel}
+              isReelGenerating={isReelGenerating}
+              apiBaseUrl={API_BASE_URL}
+              refreshLists={refreshLists}
+            />
+          </div>
+        </section>
 
-            {/* Row 2: Generated Scripts & Ready Reels (Split or Grid, Filling Remaining Height) */}
-            <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-2 min-h-0 h-full overflow-hidden">
-              <div className="min-h-0 h-full overflow-hidden flex flex-col">
-                <FileList
-                  title="Generated Scripts"
-                  data={contents}
-                  isLoading={isContentsLoading}
-                  isContentList={true}
-                  showDialogueModal={showDialogueModal}
-                  handleCaptionGeneration={handleCaptionGeneration}
-                  apiBaseUrl={API_BASE_URL}
-                  refreshLists={refreshLists}
-                />
-              </div>
-              <div className="min-h-0 h-full overflow-hidden flex flex-col">
-                <FileList
-                  title="Ready Reels"
-                  data={reels}
-                  isLoading={isReelsLoading}
-                  isContentList={false}
-                  showPreviewModal={showPreviewModal}
-                  apiBaseUrl={API_BASE_URL}
-                  refreshLists={refreshLists}
-                />
-              </div>
-            </div>
-          </section>
-
-        </main>
-      </div>
+        {/* Column 3: Activity Log (Right) */}
+        <section className="w-[30%] flex flex-col min-h-0 overflow-hidden">
+          <LogSection
+            logMessages={logMessages}
+            refreshLists={refreshLists}
+          />
+        </section>
+      </main>
 
       <VideoModals {...videoModalsProps} />
     </div>

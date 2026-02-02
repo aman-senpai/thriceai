@@ -9,6 +9,7 @@ import signal
 from datetime import datetime, time as dt_time
 import asyncio 
 import multiprocessing 
+import socket
 
 # --- IMPORTS for .ENV and TELEGRAM BOT ---
 from dotenv import load_dotenv
@@ -76,6 +77,19 @@ def cleanup_temp_dir():
         except Exception as e:
             print(f"Cleanup Warning: {e}")
 
+def get_local_ip():
+    """Attempts to retrieve the local LAN IP address."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # Doesn't need to be reachable
+        s.connect(('10.255.255.255', 1))
+        IP = s.getsockname()[0]
+    except Exception:
+        IP = '127.0.0.1'
+    finally:
+        s.close()
+    return IP
+
 def run_frontend():
     """Starts the Next.js development server in the background."""
     print("--------------------------------------------------")
@@ -96,7 +110,7 @@ def run_frontend():
 
 # --- MAIN ENTRY POINT ---
 
-def run_web_ui():
+def run_web_ui(headless: bool = False):
     """Initializes cleanup, runs the FastAPI server, and starts the frontend and bot."""
     print("\n" + "="*50)
     print("🌐 FACELESS REEL GENERATOR: FULL STACK START")
@@ -124,6 +138,7 @@ def run_web_ui():
     print("\n" + "-"*50)
     print(f"📦 Starting FastAPI Backend...")
     print(f"Backend API URL: {BACKEND_URL}")
+    print(f"Network URL: http://{get_local_ip()}:8008")
     print("-"*50)
     print("\n" + "="*50)
     print("💡 Press 's' + Enter to stop all services")
@@ -159,15 +174,24 @@ def run_web_ui():
     server_thread = threading.Thread(target=run_server_thread, daemon=True)
     server_thread.start()
     
+    
     # Listen for keyboard input to stop
     try:
-        while True:
-            user_input = input().strip().lower()
-            if user_input == 's':
-                print("\n" + "="*50)
-                print("🛑 Stopping all services...")
-                print("="*50)
-                break
+        if headless:
+            print("Headless mode enabled. Running indefinitely. Press Ctrl+C to stop or kill the process.")
+            # In headless mode, we just wait for a signal. 
+            # signal.pause() is efficient but only works on Unix. 
+            # A simple loop is more portable if needed, but we're on Linux.
+            while True:
+                time.sleep(1)
+        else:
+            while True:
+                user_input = input().strip().lower()
+                if user_input == 's':
+                    print("\n" + "="*50)
+                    print("🛑 Stopping all services...")
+                    print("="*50)
+                    break
     except (KeyboardInterrupt, EOFError):
         print("\n🛑 Interrupt received, stopping...")
     

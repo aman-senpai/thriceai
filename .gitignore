@@ -6,6 +6,10 @@ venv/
 .venv/
 env/
 
+# UV package manager
+.python-version
+uv.lock
+
 # Environment variables
 .env
 .env.*.local
@@ -34,7 +38,7 @@ wheels/
 *.egg
 
 # ------------------------------------
-# 2. Web App (Next.js / Node)
+# 2. Web App (Next.js / Node / Bun)
 # ------------------------------------
 web_app/node_modules/
 web_app/.next/
@@ -47,6 +51,8 @@ web_app/.env.local
 web_app/.env.development.local
 web_app/.env.test.local
 web_app/.env.production.local
+# Track bun.lockb for reproducible builds
+!web_app/bun.lockb
 
 # ------------------------------------
 # 3. Project Data & Outputs

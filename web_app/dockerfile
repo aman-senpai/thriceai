@@ -1,29 +1,25 @@
 # --- Stage 1: Dependency & Build Stage ---
-FROM node:20-alpine AS builder
+FROM oven/bun:alpine AS builder
 
 # Set the working directory for the container
 WORKDIR /app
 
 # Copy package files first to leverage Docker's cache
-# This layer only rebuilds if package.json or package-lock.json changes
-COPY package.json package-lock.json ./
+# This layer only rebuilds if package.json or bun.lock changes
+COPY package.json bun.lock ./
 
 # Install production and development dependencies
-# Use --frozen-lockfile or similar for deterministic installs
-RUN npm install
+RUN bun install --frozen-lockfile
 
 # Copy the rest of the application source code
-# This includes the 'pages/', 'components/', 'public/', etc.
 COPY . .
 
 # Build the Next.js application
-# This creates the optimized production build in the .next folder
-# If your build script is different, update 'npm run build'
-RUN npm run build
+RUN bun run build
 
 
 # --- Stage 2: Minimal Production Runner Stage ---
-FROM node:20-alpine AS runner
+FROM oven/bun:alpine AS runner
 
 # Set the environment variables for production
 ENV NODE_ENV production
@@ -33,18 +29,13 @@ ENV PORT 3000
 WORKDIR /app
 
 # Copy only the necessary files for a minimal Next.js production server
-# 1. Copy the optimized production build (.next)
 COPY --from=builder /app/.next ./.next
-# 2. Copy the node_modules needed at runtime (production dependencies)
 COPY --from=builder /app/node_modules ./node_modules
-# 3. Copy the package.json (needed by 'npm start' to find the start script)
 COPY --from=builder /app/package.json ./package.json
-# 4. Copy static assets (e.g., images in /public)
 COPY --from=builder /app/public ./public 
 
 # Expose the application port (internal to the container)
 EXPOSE 3000
 
 # Command to start the Next.js production server
-# The 'npm start' script in package.json typically runs 'next start'
-CMD ["npm", "run", "dev"]
+CMD ["bun", "run", "dev"]

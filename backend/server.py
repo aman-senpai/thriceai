@@ -5,12 +5,95 @@ import glob
 import sys
 import uvicorn
 import json
+import asyncio
+import logging
+from collections import deque
+from datetime import datetime
 from fastapi import FastAPI, Request, Form, HTTPException, File, UploadFile
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 from fastapi.middleware.cors import CORSMiddleware
 import time
+
+# --- Custom Logging Handler for Terminal Log Streaming ---
+class LogBuffer:
+    """Thread-safe buffer to store log messages for streaming."""
+    def __init__(self, maxlen=500):
+        self.logs = deque(maxlen=maxlen)
+        self.subscribers = set()
+        self._lock = asyncio.Lock()
+    
+    async def add_log(self, message: str, log_type: str = "info"):
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        log_entry = {"timestamp": timestamp, "type": log_type, "message": message}
+        async with self._lock:
+            self.logs.append(log_entry)
+        # Notify all subscribers
+        for queue in list(self.subscribers):
+            try:
+                await queue.put(log_entry)
+            except:
+                pass
+    
+    async def subscribe(self):
+        queue = asyncio.Queue()
+        self.subscribers.add(queue)
+        return queue
+    
+    async def unsubscribe(self, queue):
+        self.subscribers.discard(queue)
+    
+    def get_recent_logs(self):
+        return list(self.logs)
+
+log_buffer = LogBuffer()
+
+class StreamToLogBuffer:
+    """Redirect stdout to both the console and the log buffer."""
+    def __init__(self, original_stream, log_buffer_instance, log_type="info"):
+        self.original_stream = original_stream
+        self.log_buffer = log_buffer_instance
+        self.log_type = log_type
+        self.buffer = ""
+        self.loop = None
+    
+    def write(self, message):
+        if message.strip():  # Only log non-empty messages
+            # Write to original stream
+            self.original_stream.write(message)
+            
+            # Determine log type based on message content
+            log_type = self.log_type
+            msg_lower = message.lower()
+            if "error" in msg_lower or "failed" in msg_lower or "exception" in msg_lower:
+                log_type = "error"
+            elif "warning" in msg_lower or "warn" in msg_lower:
+                log_type = "warn"
+            elif "success" in msg_lower or "finished" in msg_lower or "completed" in msg_lower:
+                log_type = "success"
+            
+            # Queue the log entry asynchronously
+            try:
+                if self.loop is None or self.loop.is_closed():
+                    try:
+                        self.loop = asyncio.get_running_loop()
+                    except RuntimeError:
+                        self.loop = asyncio.new_event_loop()
+                
+                asyncio.run_coroutine_threadsafe(
+                    self.log_buffer.add_log(message.strip(), log_type),
+                    self.loop
+                )
+            except Exception:
+                pass  # Silently fail if we can't log
+    
+    def flush(self):
+        self.original_stream.flush()
+
+# Store original stdout/stderr
+original_stdout = sys.stdout
+original_stderr = sys.stderr
 
 # --- UTILITY AND BUSINESS LOGIC IMPORTS ---
 
@@ -45,9 +128,9 @@ def cleanup_temp_dir():
 
 def get_prompt_files():
     """Returns a list of available prompt files (basename and full path)."""
-    prompt_files = glob.glob(os.path.join(PROMPTS_DIR, "*.txt"))
+    prompt_files = sorted(glob.glob(os.path.join(PROMPTS_DIR, "*.txt")))
     return [
-        {"name": os.path.basename(f), "path": f}
+        {"name": os.path.basename(f), "path": f.replace("\\", "/")}
         for f in prompt_files
     ]
 
@@ -321,6 +404,45 @@ async def clear_pip_asset_api():
             pass
     return {"message": "PIP asset cleared"}
 
+
+@app.delete("/api/delete-script/{filename}")
+async def delete_script_api(filename: str):
+    """Delete a content script JSON file."""
+    if not filename.endswith(".json"):
+        filename += ".json"
+    
+    file_path = os.path.join(INPUT_DIR, filename)
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail=f"Script '{filename}' not found.")
+    
+    try:
+        os.remove(file_path)
+        # Also remove from session files if present
+        global current_session_files
+        current_session_files = [f for f in current_session_files if f.name != filename]
+        return {"message": f"Script '{filename}' deleted successfully.", "session_count": len(current_session_files)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete script: {e}")
+
+
+@app.delete("/api/delete-reel/{filename}")
+async def delete_reel_api(filename: str):
+    """Delete a generated reel video file."""
+    if not filename.endswith(".mp4"):
+        filename += ".mp4"
+    
+    file_path = os.path.join(OUTPUT_DIR, filename)
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail=f"Reel '{filename}' not found.")
+    
+    try:
+        os.remove(file_path)
+        return {"message": f"Reel '{filename}' deleted successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete reel: {e}")
+
 @app.post("/api/update-content")
 async def update_content_api(
     file_name: str = Form(...),
@@ -386,8 +508,48 @@ async def health_check():
     return {"status": "ok", "timestamp": time.time()}
 
 
+# --- Log Streaming Endpoints ---
+@app.get("/api/logs/stream")
+async def stream_logs(request: Request):
+    """SSE endpoint for real-time log streaming."""
+    async def event_generator():
+        queue = await log_buffer.subscribe()
+        try:
+            # Send recent logs first
+            for log in log_buffer.get_recent_logs()[-50:]:
+                yield f"data: {json.dumps(log)}\n\n"
+            
+            # Then stream new logs
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    log_entry = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    yield f"data: {json.dumps(log_entry)}\n\n"
+                except asyncio.TimeoutError:
+                    # Send a keepalive comment
+                    yield ": keepalive\n\n"
+        finally:
+            await log_buffer.unsubscribe(queue)
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
+
+@app.get("/api/logs/recent")
+async def get_recent_logs():
+    """Returns recent logs for initial load."""
+    return {"logs": log_buffer.get_recent_logs()[-100:]}
+
+
 @app.post("/api/generate-reels/session")
-async def generate_session_reels_api(audio_mode: str = Form(...)):
+def generate_session_reels_api(audio_mode: str = Form(...)):
     """API endpoint to trigger reel generation for current session files."""
     global current_session_files
     files_to_process_paths = [f.path for f in current_session_files]
@@ -401,7 +563,7 @@ async def generate_session_reels_api(audio_mode: str = Form(...)):
     return {"message": "Session Reel generation finished.", "results": results, "session_count": 0}
 
 @app.post("/api/generate-reels/all")
-async def generate_all_reels_api(audio_mode: str = Form(...)):
+def generate_all_reels_api(audio_mode: str = Form(...)):
     """API endpoint to trigger reel generation for ALL existing files."""
     all_files = glob.glob(os.path.join(INPUT_DIR, "*.json"))
     files_to_process_paths = all_files
@@ -414,16 +576,51 @@ async def generate_all_reels_api(audio_mode: str = Form(...)):
     return {"message": "All Reels generation finished.", "results": results}
 
 
+@app.post("/api/generate-reel/single")
+def generate_single_reel_api(
+    filename: str = Form(...),
+    audio_mode: str = Form(...)
+):
+    """API endpoint to generate a reel for a single content file."""
+    if not filename.endswith(".json"):
+        filename += ".json"
+    
+    file_path = os.path.join(INPUT_DIR, filename)
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail=f"Content file '{filename}' not found.")
+    
+    results = _process_reels([file_path], audio_mode)
+    
+    return {"message": f"Reel generation for '{filename}' finished.", "results": results}
+
+
 # --- Startup and Shutdown Hooks ---
 @app.on_event("startup")
 async def startup_event():
+    global original_stdout, original_stderr
+    
+    # Redirect stdout and stderr to capture print statements
+    stdout_redirector = StreamToLogBuffer(original_stdout, log_buffer, "info")
+    stderr_redirector = StreamToLogBuffer(original_stderr, log_buffer, "error")
+    
+    # Set the event loop for the redirectors
+    stdout_redirector.loop = asyncio.get_running_loop()
+    stderr_redirector.loop = asyncio.get_running_loop()
+    
+    sys.stdout = stdout_redirector
+    sys.stderr = stderr_redirector
+    
     # Ensure necessary directories exist
     os.makedirs(INPUT_DIR, exist_ok=True)
     os.makedirs(PROMPTS_DIR, exist_ok=True)
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     os.makedirs(CAPTION_DIR, exist_ok=True)
     os.makedirs(PIP_DIR, exist_ok=True)
-    print("Application startup: Directories confirmed.")
+    
+    # Add initial log entry
+    await log_buffer.add_log("Application startup: Directories confirmed.", "success")
+    await log_buffer.add_log("Terminal log streaming enabled.", "info")
 
 @app.on_event("shutdown")
 async def shutdown_event():

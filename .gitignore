@@ -8,7 +8,7 @@ env/
 
 # UV package manager
 .python-version
-uv.lock
+# Note: uv.lock should be tracked for reproducible builds
 
 # Environment variables
 .env
@@ -51,8 +51,7 @@ web_app/.env.local
 web_app/.env.development.local
 web_app/.env.test.local
 web_app/.env.production.local
-# Track bun.lockb for reproducible builds
-!web_app/bun.lockb
+# Note: bun.lock should be tracked for reproducible builds
 
 # ------------------------------------
 # 3. Project Data & Outputs

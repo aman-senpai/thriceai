@@ -21,4 +21,7 @@ except ImportError as e:
          sys.exit(1)
 
 if __name__ == "__main__":
-    run_web_ui()
+    if len(sys.argv) > 1 and sys.argv[1] == "--headless":
+        run_web_ui(headless=True)
+    else:
+        run_web_ui(headless=False)

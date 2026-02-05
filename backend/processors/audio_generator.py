@@ -109,14 +109,17 @@ def get_voice_id_for_role(role, tts_mode):
     """
     config = CHARACTER_MAP.get(role, {})
     
-    if tts_mode == 'gemini':
+    # Map 'default' to 'gemini' for backward compatibility or simple selection
+    effective_mode = 'gemini' if tts_mode == 'default' else tts_mode
+    
+    if effective_mode == 'gemini':
         voice_key = 'voice_gemini'
-    elif tts_mode == 'elevenlabs':
+    elif effective_mode == 'elevenlabs':
         voice_key = 'voice_eleven'
-    elif tts_mode == 'mac_say':
+    elif effective_mode == 'mac_say':
         voice_key = 'voice_mac'
     else:
-        return None # Should not happen
+        return None
 
     return config.get(voice_key)
 
@@ -143,15 +146,17 @@ def _generate_tts_only(turn_index, turn, tts_mode):
     temp_audio_path = None
     service = None
 
-    if tts_mode == 'gemini':
+    effective_mode = 'gemini' if tts_mode == 'default' else tts_mode
+
+    if effective_mode == 'gemini':
         service = gemini_tts
         temp_audio_path = TEMP_WAV_PATH.format(turn_index)
         print(f"  > Gemini TTS: Generating audio for turn {turn_index} with voice '{voice_id}'.")
-    elif tts_mode == 'elevenlabs':
+    elif effective_mode == 'elevenlabs':
         service = elevenlabs_tts
         temp_audio_path = TEMP_MP3_PATH.format(turn_index)
         print(f"  > ElevenLabs TTS: Generating audio for turn {turn_index} with voice '{voice_id}'.")
-    elif tts_mode == 'mac_say':
+    elif effective_mode == 'mac_say':
         service = mac_say_tts
         temp_audio_path = TEMP_AIFF_PATH.format(turn_index)
         print(f"  > MAC_SAY TTS: Generating audio for turn {turn_index} with voice '{voice_id}'.")

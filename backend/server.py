@@ -101,13 +101,13 @@ original_stderr = sys.stderr
 try:
     # Assuming config.py now includes CAPTION_DIR
     try:
-        from .config import INPUT_DIR, PROMPTS_DIR, CHARACTER_MAP, TEMP_DIR, VIDEO_DIR, OUTPUT_DIR, CAPTION_DIR, AVATAR_DIR, PIP_DIR
+        from .config import INPUT_DIR, PROMPTS_DIR, CHARACTER_MAP, TEMP_DIR, VIDEO_DIR, OUTPUT_DIR, CAPTION_DIR, AVATAR_DIR, PIP_DIR, CHARACTER_CONFIG_FILE
         from .services.content_writer import generate_content
         from .services.caption_generator import generate_caption 
         from .processors.reel_generator import ReelGenerator 
     except ImportError:
         # Fallback for when running directly or PYTHONPATH is set to backend
-        from config import INPUT_DIR, PROMPTS_DIR, CHARACTER_MAP, TEMP_DIR, VIDEO_DIR, OUTPUT_DIR, CAPTION_DIR, AVATAR_DIR, PIP_DIR
+        from config import INPUT_DIR, PROMPTS_DIR, CHARACTER_MAP, TEMP_DIR, VIDEO_DIR, OUTPUT_DIR, CAPTION_DIR, AVATAR_DIR, PIP_DIR, CHARACTER_CONFIG_FILE
         from services.content_writer import generate_content
         from services.caption_generator import generate_caption 
         from processors.reel_generator import ReelGenerator 
@@ -134,8 +134,11 @@ def get_prompt_files():
         for f in prompt_files
     ]
 
-def _process_reels(files_to_process_paths: List[str], audio_mode: str):
-    """Handles the core reel generation using ReelGenerator."""
+def _process_reels(items: List[Any], audio_mode: str):
+    """
+    Handles the core reel generation using ReelGenerator.
+    items can be a list of file paths (str) or a list of dicts with 'path' and optional 'pip_asset_override'.
+    """
     if not os.path.isdir(OUTPUT_DIR): 
         raise HTTPException(status_code=500, detail=f"Error: Video directory '{OUTPUT_DIR}' not found.")
         
@@ -145,12 +148,19 @@ def _process_reels(files_to_process_paths: List[str], audio_mode: str):
         raise HTTPException(status_code=500, detail=f"Error setting up TEMP_DIR: {e}")
     
     results = []
-    print(f"Starting generation for {len(files_to_process_paths)} files in {audio_mode} mode.")
-    for i, input_path in enumerate(files_to_process_paths, 1):
+    print(f"Starting generation for {len(items)} files in {audio_mode} mode.")
+    for i, item in enumerate(items, 1):
+        if isinstance(item, str):
+            input_path = item
+            pip_asset_override = None
+        else:
+            input_path = item.get('path')
+            pip_asset_override = item.get('pip_asset_override')
+            
         json_file = os.path.basename(input_path)
-        print(f"[{i}/{len(files_to_process_paths)}] Processing: {json_file}")
+        print(f"[{i}/{len(items)}] Processing: {json_file}")
         try:
-            generator = ReelGenerator(input_path)
+            generator = ReelGenerator(input_path, pip_asset_override=pip_asset_override)
             generator.create_reel(audio_mode) 
             results.append({"file": json_file, "status": "Success"})
         except Exception as e:
@@ -180,6 +190,29 @@ class GenerateContentRequest(BaseModel):
 class ContentFile(BaseModel):
     name: str
     path: str
+
+class CharacterRequest(BaseModel):
+    name: str
+    avatar: Optional[str] = None
+    voice_gemini: Optional[str] = None
+    voice_eleven: Optional[str] = None
+    voice_mac: Optional[str] = None
+
+class PromptRequest(BaseModel):
+    name: str
+    content: str
+
+class BatchItem(BaseModel):
+    topic: str
+    file_name: Optional[str] = None
+    character_a: str
+    character_b: str
+    prompt_filename: str
+    pip_asset: Optional[str] = None
+
+class BatchRequest(BaseModel):
+    jobs: List[BatchItem]
+    audio_mode: str = "default"
 
 current_session_files: List[ContentFile] = []
 
@@ -370,21 +403,17 @@ async def upload_asset_api(file: UploadFile = File(...)):
     """API endpoint to upload a PIP asset (image or video)."""
     os.makedirs(PIP_DIR, exist_ok=True)
     
-    # We clear the directory first to ensure only one asset is active
-    for f in glob.glob(os.path.join(PIP_DIR, "*")):
-        try:
-            os.remove(f)
-        except Exception as e:
-            print(f"Error removing old asset: {e}")
-
+    # Save the file to the PIP directory
     file_path = os.path.join(PIP_DIR, file.filename)
+    
     try:
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        return {"message": f"Asset {file.filename} uploaded successfully", "filename": file.filename}
+        
+        return {"message": f"Asset {file.filename} uploaded successfully.", "filename": file.filename}
     except Exception as e:
-        print(f"Error saving uploaded asset: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to save asset: {e}")
+        print(f"Error uploading asset: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to upload asset: {e}")
 
 @app.get("/api/data/pip-asset")
 async def get_pip_asset_api():
@@ -593,6 +622,84 @@ def generate_single_reel_api(
     results = _process_reels([file_path], audio_mode)
     
     return {"message": f"Reel generation for '{filename}' finished.", "results": results}
+
+
+@app.post("/api/characters")
+async def add_character_api(char: CharacterRequest):
+    """API endpoint to add a new character."""
+    global CHARACTER_MAP
+    
+    CHARACTER_MAP[char.name] = {
+        "avatar": char.avatar or f"{char.name.lower()}.png",
+        "voice_gemini": char.voice_gemini or "Rasalgethi",
+        "voice_eleven": char.voice_eleven or "KSsyodh37PbfWy29kPtx",
+        "voice_mac": char.voice_mac or "Aman"
+    }
+    
+    try:
+        with open(CHARACTER_CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(CHARACTER_MAP, f, indent=4)
+        return {"message": f"Character {char.name} added successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save character: {e}")
+
+@app.post("/api/prompts")
+async def add_prompt_api(prompt: PromptRequest):
+    """API endpoint to add a new prompt."""
+    file_name = prompt.name.replace(" ", "_").lower()
+    if not file_name.endswith(".txt"):
+        file_name += ".txt"
+    
+    file_path = os.path.join(PROMPTS_DIR, file_name)
+    
+    try:
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(prompt.content)
+        return {"message": f"Prompt {prompt.name} added successfully.", "file_path": file_path}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save prompt: {e}")
+
+@app.post("/api/generate-reel/batch")
+async def generate_batch_reels_api(request: BatchRequest):
+    """API endpoint to generate multiple reels in a batch."""
+    process_items = []
+    
+    for job in request.jobs:
+        # Use provided file_name or fallback to topic-based one
+        if job.file_name and job.file_name.strip():
+            file_name_clean = job.file_name.replace(" ", "_").lower()
+        else:
+            file_name_clean = job.topic.replace(" ", "_").lower()
+            
+        if not file_name_clean.endswith(".json"):
+            file_name_clean += ".json"
+        
+        expected_path = os.path.join(INPUT_DIR, file_name_clean)
+        
+        try:
+            # First generate the script
+            if generate_content(
+                job.topic, 
+                file_name_clean, 
+                job.prompt_filename, 
+                job.character_a, 
+                job.character_b
+            ):
+                process_items.append({
+                    "path": expected_path,
+                    "pip_asset_override": job.pip_asset
+                })
+            else:
+                print(f"Failed to generate script for topic: {job.topic}")
+        except Exception as e:
+            print(f"Error generating script for {job.topic}: {e}")
+            
+    if not process_items:
+        raise HTTPException(status_code=400, detail="No scripts were successfully generated for batch processing.")
+        
+    results = _process_reels(process_items, request.audio_mode)
+    
+    return {"message": "Batch generation finished.", "results": results}
 
 
 # --- Startup and Shutdown Hooks ---

@@ -3,6 +3,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { FileList } from "@/components/lists/FileList";
 import VideoModals, { VideoModalsProps } from "@/components/modals/VideoModals";
+import { AddCharacterModal } from "@/components/modals/AddCharacterModal";
+import { AddPromptModal } from "@/components/modals/AddPromptModal";
+import { BatchGenerator } from "@/components/generator/BatchGenerator";
 
 // Styling constants are now imported from @/lib/constants to ensure consistent theming
 
@@ -69,12 +72,12 @@ const BaseButton = ({ children, onClick, disabled, className = "" }: { children:
   </button>
 );
 
-const GenerateButton = ({ children, onClick, disabled, className, isSubmit = false }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean; className?: string, isSubmit?: boolean }) => (
+const GenerateButton = ({ children, onClick, disabled, className = "", isSubmit = false }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean; className?: string, isSubmit?: boolean }) => (
   <button
     onClick={onClick}
     disabled={disabled}
     type={isSubmit ? "submit" : "button"}
-    className={`${primaryButtonClasses} ${className}`}
+    className={className}
   >
     {children}
   </button>
@@ -90,9 +93,11 @@ interface HeaderProps {
   toggleTheme: () => void;
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  isLogVisible: boolean;
+  toggleLog: () => void;
 }
 
-const Header = ({ refreshLists, isReelGenerating, isContentGenerating, isReelsLoading, isContentsLoading, isDark, toggleTheme, activeTab, setActiveTab }: HeaderProps) => (
+const Header = ({ refreshLists, isReelGenerating, isContentGenerating, isReelsLoading, isContentsLoading, isDark, toggleTheme, activeTab, setActiveTab, isLogVisible, toggleLog }: HeaderProps) => (
   <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border px-3 py-3 md:px-6 md:py-4 shrink-0 transition-all duration-300">
     <div className="flex justify-between items-center max-w-[1920px] mx-auto">
       <div className="flex items-center gap-3">
@@ -107,6 +112,36 @@ const Header = ({ refreshLists, isReelGenerating, isContentGenerating, isReelsLo
         </div>
       </div>
       <div className="flex items-center gap-2">
+        {/* Desktop Tab Navigation */}
+        <div className="hidden md:flex bg-muted p-1 rounded-xl mr-4">
+          <button
+            onClick={() => setActiveTab('studio')}
+            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'studio' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+          >
+            Studio
+          </button>
+          <button
+            onClick={() => setActiveTab('batch')}
+            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'batch' ? 'bg-emerald-600 text-white shadow-sm' : 'text-muted-foreground hover:text-emerald-600'}`}
+          >
+            Batch
+          </button>
+        </div>
+
+        <button
+          onClick={() => setActiveTab('log')}
+          className="w-9 h-9 md:w-10 md:h-10 flex md:hidden items-center justify-center rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all active:scale-95"
+          title="Terminal"
+        >
+          <i className="fas fa-terminal text-sm md:text-base"></i>
+        </button>
+        <button
+          onClick={toggleLog}
+          className={`hidden md:flex w-9 h-9 md:w-10 md:h-10 items-center justify-center rounded-xl transition-all active:scale-95 ${isLogVisible ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}
+          title="Toggle Terminal"
+        >
+          <i className="fas fa-terminal text-sm md:text-base"></i>
+        </button>
         <button
           onClick={toggleTheme}
           className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all active:scale-95"
@@ -124,7 +159,7 @@ const Header = ({ refreshLists, isReelGenerating, isContentGenerating, isReelsLo
         </button>
       </div>
     </div>
-    {/* Mobile Tab Navigation */}
+    {/* Mobile Tab Navigation (Unchanged) */}
     <nav className="flex gap-1 mt-3 md:hidden">
       {[
         { id: 'studio', label: 'Studio', icon: 'fa-feather' },
@@ -143,6 +178,16 @@ const Header = ({ refreshLists, isReelGenerating, isContentGenerating, isReelsLo
           {tab.label}
         </button>
       ))}
+      <button
+        onClick={() => setActiveTab('batch')}
+        className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${activeTab === 'batch'
+          ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+          : 'bg-muted text-muted-foreground hover:text-foreground'
+          }`}
+      >
+        <i className="fas fa-magic"></i>
+        Batch
+      </button>
     </nav>
   </header>
 );
@@ -161,6 +206,8 @@ interface GenerateContentFormProps {
   isContentGenerating: boolean;
   isConfigValid: boolean;
   handleContentGeneration: (e: React.FormEvent) => Promise<void>;
+  onAddCharacter: () => void;
+  onAddPrompt: () => void;
 }
 
 // Helper for Character Cards - Compact Horizontal Scroll
@@ -224,6 +271,8 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
   isContentGenerating,
   isConfigValid,
   handleContentGeneration,
+  onAddCharacter,
+  onAddPrompt,
 }: GenerateContentFormProps) {
 
   return (
@@ -236,6 +285,23 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
           <h2 className="text-sm font-bold text-foreground">Studio/Script</h2>
           <p className="text-[10px] text-muted-foreground">Choose actors & generate dialogue</p>
         </div>
+      </div>
+
+      <div className="flex gap-2 mb-4 shrink-0">
+        <button
+          type="button"
+          onClick={onAddCharacter}
+          className="flex-1 px-3 py-1.5 bg-secondary text-secondary-foreground rounded-lg text-[10px] font-bold hover:bg-secondary/80 transition-all"
+        >
+          <i className="fas fa-user-plus mr-1.5"></i> Add Character
+        </button>
+        <button
+          type="button"
+          onClick={onAddPrompt}
+          className="flex-1 px-3 py-1.5 bg-secondary text-secondary-foreground rounded-lg text-[10px] font-bold hover:bg-secondary/80 transition-all"
+        >
+          <i className="fas fa-file-medical mr-1.5"></i> Add Prompt
+        </button>
       </div>
 
       <form onSubmit={handleContentGeneration} className="space-y-4 flex-1 flex flex-col overflow-hidden">
@@ -318,7 +384,7 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
           </div>
 
           <div className="pb-1">
-            <GenerateButton onClick={() => { }} disabled={!isConfigValid || isContentGenerating || isConfigLoading} isSubmit={true} className="w-full bg-primary text-primary-foreground hover:bg-primary/90 py-2.5 rounded-xl font-bold text-xs shadow-sm disabled:opacity-50 transition-colors">
+            <GenerateButton onClick={() => { }} disabled={!isConfigValid || isContentGenerating || isConfigLoading} isSubmit={true} className={primaryButtonClasses}>
               {isContentGenerating ? (<><i className="fas fa-spinner fa-spin mr-2"></i> Generating...</>) : ("Generate Content")}
             </GenerateButton>
             {contentStatus && (
@@ -429,11 +495,11 @@ const ReelGenerationSection = ({
     </div>
 
     <div className="flex gap-2">
-      <GenerateButton onClick={handleSessionReelGeneration} disabled={isReelGenerating || sessionCount <= 0 || !audioMode} className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 text-xs py-2 rounded-xl shadow-sm transition-all disabled:opacity-50">
+      <GenerateButton onClick={handleSessionReelGeneration} disabled={isReelGenerating || sessionCount <= 0 || !audioMode} className={primaryButtonClasses}>
         {isReelGenerating && sessionCount > 0 ? <i className="fas fa-spinner fa-spin mr-2"></i> : null}
         <span id="generate-session-reels-btn">Session ({sessionCount})</span>
       </GenerateButton>
-      <GenerateButton onClick={handleAllReelGeneration} disabled={isReelGenerating || !audioMode} className="flex-1 bg-emerald-600 text-white hover:bg-emerald-700 text-xs py-2 rounded-xl shadow-sm transition-all disabled:opacity-50">
+      <GenerateButton onClick={handleAllReelGeneration} disabled={isReelGenerating || !audioMode} className={successButtonClasses}>
         {isReelGenerating && sessionCount === 0 ? <i className="fas fa-spinner fa-spin mr-2"></i> : null}
         <span id="generate-all-reels-btn">All Files</span>
       </GenerateButton>
@@ -444,9 +510,10 @@ const ReelGenerationSection = ({
 interface LogSectionProps {
   logMessages: LogMessage[];
   refreshLists: () => void;
+  onClose?: () => void;
 }
 
-const LogSection = ({ logMessages, refreshLists }: LogSectionProps) => (
+const LogSection = ({ logMessages, refreshLists, onClose }: LogSectionProps) => (
   <div className="bg-card text-card-foreground p-4 rounded-2xl shadow-sm border border-border h-full flex flex-col">
     <div className="flex justify-between items-center mb-3 shrink-0">
       <div className="flex items-center gap-2">
@@ -455,9 +522,16 @@ const LogSection = ({ logMessages, refreshLists }: LogSectionProps) => (
         </div>
         <h2 className="text-xs font-bold text-foreground">Activity Log</h2>
       </div>
-      <button onClick={refreshLists} className="p-1 px-2 text-muted-foreground hover:text-foreground transition rounded hover:bg-secondary">
-        <i className="fas fa-sync text-xs"></i>
-      </button>
+      <div className="flex items-center gap-1">
+        <button onClick={refreshLists} className="p-1 px-2 text-muted-foreground hover:text-foreground transition rounded hover:bg-secondary" title="Refresh">
+          <i className="fas fa-sync text-xs"></i>
+        </button>
+        {onClose && (
+          <button onClick={onClose} className="p-1 px-2 text-muted-foreground hover:text-destructive transition rounded hover:bg-secondary" title="Close Panel">
+            <i className="fas fa-times text-xs"></i>
+          </button>
+        )}
+      </div>
     </div>
     <div className="flex-1 overflow-y-auto custom-scrollbar font-mono text-[10px] p-3 bg-secondary/30 rounded-xl border border-border space-y-1.5 shadow-inner h-0 min-h-0">
       {logMessages.length === 0 && <span className="text-muted-foreground italic">System ready...</span>}
@@ -516,6 +590,11 @@ export default function Page() {
   const [isCaptionModalOpen, setIsCaptionModalOpen] = useState(false);
   const [captionContent, setCaptionContent] = useState('');
   const [captionFileName, setCaptionFileName] = useState('');
+
+  // New Feature Modals
+  const [isAddCharacterModalOpen, setIsAddCharacterModalOpen] = useState(false);
+  const [isAddPromptModalOpen, setIsAddPromptModalOpen] = useState(false);
+  const [isLogVisible, setIsLogVisible] = useState(false);
 
 
   const log = useCallback((message: string, type: LogType = "info") => {
@@ -937,10 +1016,22 @@ export default function Page() {
         toggleTheme={toggleTheme}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
+        isLogVisible={isLogVisible}
+        toggleLog={() => setIsLogVisible(!isLogVisible)}
       />
 
       {/* Mobile Layout - Tab Content */}
       <main className="flex-1 p-2 md:hidden overflow-y-auto">
+        {activeTab === 'batch' && (
+          <div className="animate-fade-in h-[calc(100vh-180px)]">
+            <BatchGenerator
+              config={config}
+              log={log}
+              refreshLists={refreshLists}
+              API_BASE_URL={API_BASE_URL}
+            />
+          </div>
+        )}
         {activeTab === 'studio' && (
           <div className="space-y-3 animate-fade-in">
             <GenerateContentForm
@@ -949,15 +1040,15 @@ export default function Page() {
               charB={charB} setCharB={setCharB}
               audioMode={audioMode} setAudioMode={setAudioMode}
               promptPath={promptPath} setPromptPath={setPromptPath}
-              query={query}
-              handleQueryChange={handleQueryChange}
-              fileName={fileName}
-              handleFileNameChange={handleFileNameChange}
+              query={query} handleQueryChange={handleQueryChange}
+              fileName={fileName} handleFileNameChange={handleFileNameChange}
               contentStatus={contentStatus}
               isConfigLoading={isConfigLoading}
               isContentGenerating={isContentGenerating}
               isConfigValid={isConfigValid}
               handleContentGeneration={handleContentGeneration}
+              onAddCharacter={() => setIsAddCharacterModalOpen(true)}
+              onAddPrompt={() => setIsAddPromptModalOpen(true)}
             />
             <ReelGenerationSection
               handleSessionReelGeneration={handleSessionReelGeneration}
@@ -1012,88 +1103,116 @@ export default function Page() {
         )}
       </main>
 
-      {/* Desktop Layout - 3 Column Grid */}
-      <main className="hidden md:flex flex-1 p-3 lg:p-4 gap-3 lg:gap-4 min-h-0 overflow-hidden max-w-[1920px] mx-auto w-full">
+      {/* Desktop Layout - 2 Column Grid with Bottom Terminal */}
+      <main className="hidden md:flex flex-1 p-3 lg:p-4 gap-3 lg:gap-4 min-h-0 overflow-hidden max-w-[1920px] mx-auto w-full flex-col">
+        <div className="flex flex-1 gap-3 lg:gap-4 min-h-0 overflow-hidden">
+          {/* Column 1: Studio/Script (Left) */}
+          <section className="w-1/2 flex-1 flex flex-col gap-3 min-h-0 overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-hidden">
+              {activeTab === 'batch' ? (
+                <BatchGenerator
+                  config={config}
+                  log={log}
+                  refreshLists={refreshLists}
+                  API_BASE_URL={API_BASE_URL}
+                />
+              ) : (
+                <GenerateContentForm
+                  config={config}
+                  charA={charA} setCharA={setCharA}
+                  charB={charB} setCharB={setCharB}
+                  audioMode={audioMode} setAudioMode={setAudioMode}
+                  promptPath={promptPath} setPromptPath={setPromptPath}
+                  query={query} handleQueryChange={handleQueryChange}
+                  fileName={fileName} handleFileNameChange={handleFileNameChange}
+                  contentStatus={contentStatus}
+                  isConfigLoading={isConfigLoading}
+                  isContentGenerating={isContentGenerating}
+                  isConfigValid={isConfigValid}
+                  handleContentGeneration={handleContentGeneration}
+                  onAddCharacter={() => setIsAddCharacterModalOpen(true)}
+                  onAddPrompt={() => setIsAddPromptModalOpen(true)}
+                />
+              )}
+            </div>
+            {activeTab !== 'batch' && (
+              <div className="shrink-0">
+                <ReelGenerationSection
+                  handleSessionReelGeneration={handleSessionReelGeneration}
+                  handleAllReelGeneration={handleAllReelGeneration}
+                  isReelGenerating={isReelGenerating}
+                  sessionCount={sessionCount}
+                  audioMode={audioMode}
+                  reelStatus={reelStatus}
+                  config={config}
+                  pipAsset={pipAsset}
+                  isPipUploading={isPipUploading}
+                  handlePipUpload={handlePipUpload}
+                  handleClearPipAsset={handleClearPipAsset}
+                />
+              </div>
+            )}
+          </section>
 
-        {/* Column 1: Studio/Script (Left) */}
-        <section className="w-[38%] lg:w-[35%] flex flex-col gap-3 min-h-0 overflow-hidden">
-          <div className="flex-1 min-h-0 overflow-hidden">
-            <GenerateContentForm
-              config={config}
-              charA={charA} setCharA={setCharA}
-              charB={charB} setCharB={setCharB}
-              audioMode={audioMode} setAudioMode={setAudioMode}
-              promptPath={promptPath} setPromptPath={setPromptPath}
-              query={query}
-              handleQueryChange={handleQueryChange}
-              fileName={fileName}
-              handleFileNameChange={handleFileNameChange}
-              contentStatus={contentStatus}
-              isConfigLoading={isConfigLoading}
-              isContentGenerating={isContentGenerating}
-              isConfigValid={isConfigValid}
-              handleContentGeneration={handleContentGeneration}
-            />
-          </div>
-          <div className="shrink-0">
-            <ReelGenerationSection
-              handleSessionReelGeneration={handleSessionReelGeneration}
-              handleAllReelGeneration={handleAllReelGeneration}
-              isReelGenerating={isReelGenerating}
-              sessionCount={sessionCount}
-              audioMode={audioMode}
-              reelStatus={reelStatus}
-              config={config}
-              pipAsset={pipAsset}
-              isPipUploading={isPipUploading}
-              handlePipUpload={handlePipUpload}
-              handleClearPipAsset={handleClearPipAsset}
-            />
-          </div>
-        </section>
+          {/* Column 2: File Lists (Right) */}
+          <section className="w-1/2 flex-1 flex flex-col gap-3 min-h-0 overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <FileList
+                title="Generated Scripts"
+                data={contents}
+                isLoading={isContentsLoading}
+                isContentList={true}
+                showDialogueModal={showDialogueModal}
+                handleCaptionGeneration={handleCaptionGeneration}
+                handleSingleReelGeneration={handleSingleReelGeneration}
+                handleDeleteScript={handleDeleteScript}
+                isReelGenerating={isReelGenerating}
+                apiBaseUrl={API_BASE_URL}
+                refreshLists={refreshLists}
+              />
+            </div>
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <FileList
+                title="Ready Reels"
+                data={reels}
+                isLoading={isReelsLoading}
+                isContentList={false}
+                showPreviewModal={showPreviewModal}
+                handleDeleteReel={handleDeleteReel}
+                isReelGenerating={isReelGenerating}
+                apiBaseUrl={API_BASE_URL}
+                refreshLists={refreshLists}
+              />
+            </div>
+          </section>
+        </div>
 
-        {/* Column 2: File Lists (Center) */}
-        <section className="w-[32%] lg:w-[35%] flex flex-col gap-3 min-h-0 overflow-hidden">
-          <div className="flex-1 min-h-0 overflow-hidden">
-            <FileList
-              title="Generated Scripts"
-              data={contents}
-              isLoading={isContentsLoading}
-              isContentList={true}
-              showDialogueModal={showDialogueModal}
-              handleCaptionGeneration={handleCaptionGeneration}
-              handleSingleReelGeneration={handleSingleReelGeneration}
-              handleDeleteScript={handleDeleteScript}
-              isReelGenerating={isReelGenerating}
-              apiBaseUrl={API_BASE_URL}
+        {/* Collapsible Bottom Terminal Section */}
+        {isLogVisible && (
+          <section className="h-64 mt-3 bg-card border border-border rounded-2xl shadow-lg animate-in slide-in-from-bottom-5 duration-300">
+            <LogSection
+              logMessages={logMessages}
               refreshLists={refreshLists}
+              onClose={() => setIsLogVisible(false)}
             />
-          </div>
-          <div className="flex-1 min-h-0 overflow-hidden">
-            <FileList
-              title="Ready Reels"
-              data={reels}
-              isLoading={isReelsLoading}
-              isContentList={false}
-              showPreviewModal={showPreviewModal}
-              handleDeleteReel={handleDeleteReel}
-              isReelGenerating={isReelGenerating}
-              apiBaseUrl={API_BASE_URL}
-              refreshLists={refreshLists}
-            />
-          </div>
-        </section>
-
-        {/* Column 3: Activity Log (Right) */}
-        <section className="w-[30%] flex flex-col min-h-0 overflow-hidden">
-          <LogSection
-            logMessages={logMessages}
-            refreshLists={refreshLists}
-          />
-        </section>
+          </section>
+        )}
       </main>
 
       <VideoModals {...videoModalsProps} />
+
+      <AddCharacterModal
+        isOpen={isAddCharacterModalOpen}
+        onClose={() => setIsAddCharacterModalOpen(false)}
+        onSuccess={loadConfig}
+        log={log}
+      />
+      <AddPromptModal
+        isOpen={isAddPromptModalOpen}
+        onClose={() => setIsAddPromptModalOpen(false)}
+        onSuccess={loadConfig}
+        log={log}
+      />
     </div>
   );
 }

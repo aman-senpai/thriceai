@@ -94,3 +94,25 @@ export const postData = async (endpoint: string, payload: Record<string, any>) =
   }
   return response.json();
 };
+
+export const postJson = async (endpoint: string, payload: any) => {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    try {
+      const errorJson = JSON.parse(errorText);
+      throw new Error(
+        errorJson.detail || `POST ${endpoint} failed: ${response.statusText}`,
+      );
+    } catch {
+      throw new Error(`POST ${endpoint} failed: ${errorText}`);
+    }
+  }
+  return response.json();
+};

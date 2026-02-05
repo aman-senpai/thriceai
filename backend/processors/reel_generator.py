@@ -75,8 +75,9 @@ class ReelGenerator:
     from a conversation JSON, including TTS, timestamp alignment, 
     video cropping, and caption animation, and avatar animation.
     """
-    def __init__(self, input_json_path):
+    def __init__(self, input_json_path, pip_asset_override=None):
         self.input_json_path = input_json_path
+        self.pip_asset_override = pip_asset_override
         self.base_name = os.path.basename(input_json_path).replace('.json', '')
         self.final_reel_name = f"{self.base_name}.mp4"
         self.final_output_path = os.path.join(OUTPUT_DIR, self.final_reel_name)
@@ -188,11 +189,23 @@ class ReelGenerator:
             return None
 
         duration = end_time - start_time
-        assets = glob.glob(os.path.join(PIP_DIR, "*"))
-        if not assets:
+        
+        # Determine asset path
+        if self.pip_asset_override:
+            if os.path.isabs(self.pip_asset_override):
+                asset_path = self.pip_asset_override
+            else:
+                asset_path = os.path.join(PIP_DIR, self.pip_asset_override)
+        else:
+            assets = glob.glob(os.path.join(PIP_DIR, "*"))
+            if not assets:
+                return None
+            asset_path = assets[0]
+
+        if not os.path.exists(asset_path):
+            print(f"PIP asset not found: {asset_path}")
             return None
             
-        asset_path = assets[0]
         ext = os.path.splitext(asset_path)[1].lower()
         
         try:
@@ -204,7 +217,11 @@ class ReelGenerator:
                     else:
                         pip_clip = pip_clip.subclip(0, duration)
             else:
-                pip_clip = ImageClip(asset_path, duration=duration)
+                # Use Pillow to load images for better format support (including WebP)
+                img = Image.open(asset_path)
+                if img.mode != 'RGBA':
+                    img = img.convert('RGBA')
+                pip_clip = ImageClip(np.array(img), duration=duration)
             
             pip_clip = pip_clip.resize(width=PIP_WIDTH)
             

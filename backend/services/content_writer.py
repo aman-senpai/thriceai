@@ -3,6 +3,7 @@
 import os
 import json
 import string
+import re
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -56,6 +57,26 @@ def add_citations(response):
             text = text[:end_index] + citation_string + text[end_index:]
 
     return text
+
+def clean_grounding_links(text: str) -> str:
+    """
+    Strips grounding citations and markdown links from the text.
+    Handles [1](link), [ [1](link) ], etc.
+    """
+    # 1. Remove markdown links: [label](url)
+    # This also catches [1](https://...)
+    text = re.sub(r'\[([^\]]+)\]\(https?://[^\s)]+\)', r'\1', text)
+    
+    # 2. Remove standalone citation brackets [1], [2], [1, 2], [ [1] ]
+    # that might remain if not in link format or if nested
+    text = re.sub(r'\[\s*\[?\s*\d+(?:\s*,\s*\d+)*\s*\]?\s*\]', '', text)
+    text = re.sub(r'\[\s*\d+(?:\s*,\s*\d+)*\s*\]', '', text)
+    
+    # Clean up double spaces or spaces before punctuation that might result from removal
+    text = re.sub(r'\s+([.,!?;])', r'\1', text)
+    text = re.sub(r'\s{2,}', ' ', text)
+    
+    return text.strip()
 
 def generate_content(query: str, file_name: str, prompt_file_path: str, char_a_name: str, char_b_name: str) -> bool:
     """
@@ -118,32 +139,23 @@ def generate_content(query: str, file_name: str, prompt_file_path: str, char_a_n
         try:
             content = json.loads(text_with_citations)
         except json.JSONDecodeError:
-            # Fallback: try parsing the original text without citations if the modified one failed
             try:
                 content = json.loads(response.text)
-                print("Warning: Could not parse JSON with citations, using original text.")
             except json.JSONDecodeError:
                  print("Error: Model returned invalid JSON.")
-                 print(f"Raw response: {response.text}")
                  return False
 
-        # Display structured content neatly
-        print("Generated Content:")
-        print("-" * 80)
+        # --- CLEANUP GROUNDING LINKS FROM CONVERSATION ---
         if "conversation" in content:
             for item in content["conversation"]:
-                role = item.get("role", "Unknown")
-                text = item.get("text", "")
-                print(f"{role}: {text.strip()}")
-        else:
-             print(json.dumps(content, indent=2))
-        print("-" * 80)
+                if "text" in item:
+                    item["text"] = clean_grounding_links(item["text"])
         
-        # Grounding info logging
+        # Grounding info logging (minimal)
         if response.candidates and response.candidates[0].grounding_metadata:
              md = response.candidates[0].grounding_metadata
              if md.web_search_queries:
-                 print(f"Search Queries Used: {md.web_search_queries}")
+                 print(f"  > Gemini Search Queries: {md.web_search_queries}")
         
         # Save JSON output
         os.makedirs(os.path.dirname(file_path), exist_ok=True)

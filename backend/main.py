@@ -219,5 +219,7 @@ def run_web_ui(headless: bool = False):
 
 
 if __name__ == "__main__":
+    import sys
+    headless = "--headless" in sys.argv
     multiprocessing.freeze_support() 
-    run_web_ui()
+    run_web_ui(headless=headless)

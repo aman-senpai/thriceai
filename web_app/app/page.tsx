@@ -208,6 +208,10 @@ interface GenerateContentFormProps {
   handleContentGeneration: (e: React.FormEvent) => Promise<void>;
   onAddCharacter: () => void;
   onAddPrompt: () => void;
+  pipAsset: string | null;
+  isPipUploading: boolean;
+  handlePipUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleClearPipAsset: () => void;
 }
 
 // Helper for Character Cards - Compact Horizontal Scroll
@@ -273,12 +277,16 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
   handleContentGeneration,
   onAddCharacter,
   onAddPrompt,
+  pipAsset,
+  isPipUploading,
+  handlePipUpload,
+  handleClearPipAsset,
 }: GenerateContentFormProps) {
 
   return (
     <div id="config-section" className="bg-card text-card-foreground p-6 rounded-2xl shadow-sm border border-border flex flex-col h-full">
       <div className="flex items-center gap-3 mb-6 shrink-0">
-        <div className="p-3 bg-secondary rounded-xl text-secondary-foreground">
+        <div className="w-10 h-10 bg-secondary rounded-xl text-secondary-foreground flex items-center justify-center shrink-0">
           <i className="fas fa-feather"></i>
         </div>
         <div>
@@ -287,22 +295,7 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
         </div>
       </div>
 
-      <div className="flex gap-2 mb-4 shrink-0">
-        <button
-          type="button"
-          onClick={onAddCharacter}
-          className="flex-1 px-3 py-1.5 bg-secondary text-secondary-foreground rounded-lg text-[10px] font-bold hover:bg-secondary/80 transition-all"
-        >
-          <i className="fas fa-user-plus mr-1.5"></i> Add Character
-        </button>
-        <button
-          type="button"
-          onClick={onAddPrompt}
-          className="flex-1 px-3 py-1.5 bg-secondary text-secondary-foreground rounded-lg text-[10px] font-bold hover:bg-secondary/80 transition-all"
-        >
-          <i className="fas fa-file-medical mr-1.5"></i> Add Prompt
-        </button>
-      </div>
+      {/* Removed separate button section */}
 
       <form onSubmit={handleContentGeneration} className="space-y-4 flex-1 flex flex-col overflow-hidden">
 
@@ -310,7 +303,17 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
         <div className="shrink-0 space-y-3">
           <div className="bg-secondary/30 rounded-xl p-4 border border-border space-y-3">
             <div>
-              <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Prompt Template</label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest">Prompt Template</label>
+                <button
+                  type="button"
+                  onClick={onAddPrompt}
+                  className="w-6 h-6 flex items-center justify-center bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-all"
+                  title="Add New Prompt"
+                >
+                  <i className="fas fa-plus text-[10px]"></i>
+                </button>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {config && Object.entries(config.prompts).map(([path, name]) => {
                   const isSelected = promptPath === path;
@@ -344,8 +347,8 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+              <div className="md:col-span-3">
                 <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Filename</label>
                 <input
                   type="text"
@@ -356,7 +359,7 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
                   disabled={isConfigLoading || isContentGenerating}
                 />
               </div>
-              <div>
+              <div className="md:col-span-5">
                 <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Audio Mode</label>
                 <div className="flex flex-wrap gap-2">
                   {config && Object.keys(config.audio_modes).map((mode) => {
@@ -380,30 +383,90 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
                   })}
                 </div>
               </div>
+              <div className="md:col-span-4">
+                <GenerateButton onClick={() => { }} disabled={!isConfigValid || isContentGenerating || isConfigLoading} isSubmit={true} className={`${primaryButtonClasses} !py-2.5 !text-xs`}>
+                  {isContentGenerating ? (<><i className="fas fa-spinner fa-spin mr-2"></i> Generating...</>) : (<><i className="fas fa-magic mr-1.5"></i> Generate Content</>)}
+                </GenerateButton>
+              </div>
             </div>
           </div>
 
-          <div className="pb-1">
-            <GenerateButton onClick={() => { }} disabled={!isConfigValid || isContentGenerating || isConfigLoading} isSubmit={true} className={primaryButtonClasses}>
-              {isContentGenerating ? (<><i className="fas fa-spinner fa-spin mr-2"></i> Generating...</>) : ("Generate Content")}
-            </GenerateButton>
-            {contentStatus && (
-              <div className="mt-3 p-2.5 rounded-lg bg-secondary text-center text-xs font-medium text-secondary-foreground animate-fade-in border border-border">
-                {contentStatus}
-              </div>
-            )}
-          </div>
+          {contentStatus && (
+            <div className="mt-3 p-2.5 rounded-lg bg-secondary text-center text-xs font-medium text-secondary-foreground animate-fade-in border border-border max-h-32 overflow-y-auto custom-scrollbar">
+              {contentStatus}
+            </div>
+          )}
         </div>
 
-        {/* Character Selection - Compact Horizontal Scroll */}
-        <div className="space-y-4 pt-4 border-t border-border">
-          <CharacterScroll label="Speaker 1" selected={charA} onSelect={setCharA} exclude={charB} config={config} isContentGenerating={isContentGenerating} />
-          <div className="flex items-center gap-3 px-1">
-            <div className="h-px bg-border flex-1"></div>
-            <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">vs</span>
-            <div className="h-px bg-border flex-1"></div>
+        {/* Bottom Section: Characters and PIP Asset in Two Columns */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-border mt-auto">
+          {/* Column 1: Character Selection */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1">Characters</h3>
+              <button
+                type="button"
+                onClick={onAddCharacter}
+                className="w-6 h-6 flex items-center justify-center bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-all"
+                title="Add New Character"
+              >
+                <i className="fas fa-plus text-[10px]"></i>
+              </button>
+            </div>
+            <CharacterScroll label="Speaker 1" selected={charA} onSelect={setCharA} exclude={charB} config={config} isContentGenerating={isContentGenerating} />
+            <div className="flex items-center gap-3 px-1">
+              <div className="h-px bg-border flex-1"></div>
+              <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">vs</span>
+              <div className="h-px bg-border flex-1"></div>
+            </div>
+            <CharacterScroll label="Speaker 2" selected={charB} onSelect={setCharB} exclude={charA} config={config} isContentGenerating={isContentGenerating} />
           </div>
-          <CharacterScroll label="Speaker 2" selected={charB} onSelect={setCharB} exclude={charA} config={config} isContentGenerating={isContentGenerating} />
+
+          {/* Column 2: PIP Asset Upload */}
+          <div className="space-y-4">
+            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1">PIP Asset (Optional)</h3>
+            <div className="bg-secondary/30 rounded-xl p-4 border border-border h-[calc(100%-2rem)] flex flex-col justify-center">
+              {pipAsset ? (
+                <div className="flex items-center justify-between bg-background p-3 rounded-lg border border-border">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <i className="fas fa-file-image text-muted-foreground"></i>
+                    <span className="text-xs font-medium truncate text-foreground">{pipAsset}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleClearPipAsset}
+                    className="text-muted-foreground hover:text-destructive p-1 transition-colors"
+                    title="Clear Asset"
+                  >
+                    <i className="fas fa-times"></i>
+                  </button>
+                </div>
+              ) : (
+                <div className="relative group h-32">
+                  <input
+                    type="file"
+                    accept="image/*,video/*"
+                    onChange={handlePipUpload}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    disabled={isPipUploading}
+                  />
+                  <div className="border-2 border-dashed border-border rounded-lg h-full flex flex-col items-center justify-center gap-2 group-hover:border-primary/50 transition-colors">
+                    {isPipUploading ? (
+                      <i className="fas fa-spinner fa-spin text-muted-foreground"></i>
+                    ) : (
+                      <>
+                        <i className="fas fa-cloud-upload-alt text-2xl text-muted-foreground group-hover:text-primary transition-colors"></i>
+                        <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">Click or drag upload</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+              <p className="text-[10px] text-muted-foreground mt-3 leading-tight italic opacity-70">
+                * PIP (Picture-in-Picture) will be placed above captions in the final reel.
+              </p>
+            </div>
+          </div>
         </div>
 
       </form>
@@ -419,10 +482,6 @@ interface ReelGenerationSectionProps {
   audioMode: string;
   reelStatus: string;
   config: ConfigData | null;
-  pipAsset: string | null;
-  isPipUploading: boolean;
-  handlePipUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  handleClearPipAsset: () => void;
 }
 
 const ReelGenerationSection = ({
@@ -433,10 +492,6 @@ const ReelGenerationSection = ({
   audioMode,
   reelStatus,
   config,
-  pipAsset,
-  isPipUploading,
-  handlePipUpload,
-  handleClearPipAsset
 }: ReelGenerationSectionProps) => (
   <div className="bg-card text-card-foreground p-5 rounded-2xl shadow-sm border border-border space-y-4">
     <div className="flex items-center justify-between">
@@ -445,53 +500,10 @@ const ReelGenerationSection = ({
         Build Reels
       </h2>
       {reelStatus && (
-        <span className="text-[10px] font-medium px-2 py-1 bg-secondary text-secondary-foreground rounded-lg">
+        <span className="text-[10px] font-medium px-2 py-1 bg-secondary text-secondary-foreground rounded-lg max-w-[200px] truncate" title={reelStatus}>
           {reelStatus}
         </span>
       )}
-    </div>
-
-    {/* PIP Asset Upload Section */}
-    <div className="bg-secondary/30 rounded-xl p-3 border border-border">
-      <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">PIP Asset (Optional)</label>
-      {pipAsset ? (
-        <div className="flex items-center justify-between bg-background p-2 rounded-lg border border-border">
-          <div className="flex items-center gap-2 min-w-0">
-            <i className="fas fa-file-image text-muted-foreground"></i>
-            <span className="text-xs font-medium truncate text-foreground">{pipAsset}</span>
-          </div>
-          <button
-            onClick={handleClearPipAsset}
-            className="text-muted-foreground hover:text-destructive p-1 transition-colors"
-            title="Clear Asset"
-          >
-            <i className="fas fa-times"></i>
-          </button>
-        </div>
-      ) : (
-        <div className="relative group">
-          <input
-            type="file"
-            accept="image/*,video/*"
-            onChange={handlePipUpload}
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-            disabled={isPipUploading}
-          />
-          <div className="border-2 border-dashed border-border rounded-lg p-3 text-center group-hover:border-primary/50 transition-colors">
-            {isPipUploading ? (
-              <i className="fas fa-spinner fa-spin text-muted-foreground"></i>
-            ) : (
-              <div className="flex flex-col items-center gap-1">
-                <i className="fas fa-cloud-upload-alt text-muted-foreground group-hover:text-primary transition-colors"></i>
-                <span className="text-[10px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">Click or drag</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-      <p className="text-[9px] text-muted-foreground mt-2 leading-tight italic opacity-70">
-        * PIP will be placed above captions.
-      </p>
     </div>
 
     <div className="flex gap-2">
@@ -513,8 +525,9 @@ interface LogSectionProps {
   onClose?: () => void;
 }
 
+// Added explicit height constraint to LogSection container for safety
 const LogSection = ({ logMessages, refreshLists, onClose }: LogSectionProps) => (
-  <div className="bg-card text-card-foreground p-4 rounded-2xl shadow-sm border border-border h-full flex flex-col">
+  <div className="bg-card text-card-foreground p-4 rounded-2xl shadow-sm border border-border h-full flex flex-col min-h-0">
     <div className="flex justify-between items-center mb-3 shrink-0">
       <div className="flex items-center gap-2">
         <div className="p-1.5 bg-secondary rounded-lg text-secondary-foreground">
@@ -533,7 +546,7 @@ const LogSection = ({ logMessages, refreshLists, onClose }: LogSectionProps) => 
         )}
       </div>
     </div>
-    <div className="flex-1 overflow-y-auto custom-scrollbar font-mono text-[10px] p-3 bg-secondary/30 rounded-xl border border-border space-y-1.5 shadow-inner h-0 min-h-0">
+    <div className="flex-1 overflow-y-auto custom-scrollbar font-mono text-[10px] p-3 bg-secondary/30 rounded-xl border border-border space-y-1.5 shadow-inner min-h-0 h-full max-h-full">
       {logMessages.length === 0 && <span className="text-muted-foreground italic">System ready...</span>}
       {[...logMessages].reverse().map((log, idx) => (
         <div key={idx} className="flex gap-2 leading-tight">
@@ -1049,6 +1062,10 @@ export default function Page() {
               handleContentGeneration={handleContentGeneration}
               onAddCharacter={() => setIsAddCharacterModalOpen(true)}
               onAddPrompt={() => setIsAddPromptModalOpen(true)}
+              pipAsset={pipAsset}
+              isPipUploading={isPipUploading}
+              handlePipUpload={handlePipUpload}
+              handleClearPipAsset={handleClearPipAsset}
             />
             <ReelGenerationSection
               handleSessionReelGeneration={handleSessionReelGeneration}
@@ -1058,10 +1075,6 @@ export default function Page() {
               audioMode={audioMode}
               reelStatus={reelStatus}
               config={config}
-              pipAsset={pipAsset}
-              isPipUploading={isPipUploading}
-              handlePipUpload={handlePipUpload}
-              handleClearPipAsset={handleClearPipAsset}
             />
           </div>
         )}
@@ -1103,9 +1116,9 @@ export default function Page() {
         )}
       </main>
 
-      {/* Desktop Layout - 2 Column Grid with Bottom Terminal */}
-      <main className="hidden md:flex flex-1 p-3 lg:p-4 gap-3 lg:gap-4 min-h-0 overflow-hidden max-w-[1920px] mx-auto w-full flex-col">
-        <div className="flex flex-1 gap-3 lg:gap-4 min-h-0 overflow-hidden">
+      {/* Desktop Layout - 2 Column Grid with Right Sidebar Terminal */}
+      <main className="hidden md:flex flex-1 p-3 lg:p-4 gap-3 lg:gap-4 min-h-0 overflow-hidden max-w-[1920px] mx-auto w-full flex-row">
+        <div className="flex-1 flex gap-3 lg:gap-4 min-h-0 overflow-hidden">
           {/* Column 1: Studio/Script (Left) */}
           <section className="w-1/2 flex-1 flex flex-col gap-3 min-h-0 overflow-hidden">
             <div className="flex-1 min-h-0 overflow-hidden">
@@ -1132,6 +1145,10 @@ export default function Page() {
                   handleContentGeneration={handleContentGeneration}
                   onAddCharacter={() => setIsAddCharacterModalOpen(true)}
                   onAddPrompt={() => setIsAddPromptModalOpen(true)}
+                  pipAsset={pipAsset}
+                  isPipUploading={isPipUploading}
+                  handlePipUpload={handlePipUpload}
+                  handleClearPipAsset={handleClearPipAsset}
                 />
               )}
             </div>
@@ -1145,10 +1162,6 @@ export default function Page() {
                   audioMode={audioMode}
                   reelStatus={reelStatus}
                   config={config}
-                  pipAsset={pipAsset}
-                  isPipUploading={isPipUploading}
-                  handlePipUpload={handlePipUpload}
-                  handleClearPipAsset={handleClearPipAsset}
                 />
               </div>
             )}
@@ -1187,9 +1200,9 @@ export default function Page() {
           </section>
         </div>
 
-        {/* Collapsible Bottom Terminal Section */}
+        {/* Collapsible Right Sidebar Terminal Section */}
         {isLogVisible && (
-          <section className="h-64 mt-3 bg-card border border-border rounded-2xl shadow-lg animate-in slide-in-from-bottom-5 duration-300">
+          <section className="w-80 lg:w-96 shrink-0 bg-card border border-border rounded-2xl shadow-lg animate-in slide-in-from-right-5 duration-300 overflow-hidden">
             <LogSection
               logMessages={logMessages}
               refreshLists={refreshLists}

@@ -1,6 +1,5 @@
 import React from 'react';
 import { ReelItem, ContentItem } from '../../types';
-import { cardClasses } from '../../lib/constants';
 
 interface FileListProps {
     title: string;
@@ -37,43 +36,43 @@ export const FileList: React.FC<FileListProps> = ({
     }
 
     return (
-        <div className={cardClasses + " p-4 sm:p-6 h-full flex flex-col"}>
-            <h2 className="text-lg sm:text-xl font-bold mb-4 sm:mb-6 text-zinc-900 dark:text-white flex justify-between items-center">
+        <div className="bg-card text-card-foreground p-5 sm:p-6 rounded-2xl shadow-sm border border-border h-full flex flex-col">
+            <h2 className="text-lg sm:text-xl font-bold mb-4 sm:mb-6 text-foreground flex justify-between items-center">
                 <span className="flex items-center gap-2 sm:gap-3">
-                    <div className={`p-1.5 sm:p-2 rounded-lg ${isContentList ? 'bg-amber-100 text-amber-600' : 'bg-indigo-100 text-indigo-600'} dark:bg-zinc-800`}>
+                    <div className={`p-1.5 sm:p-2 rounded-lg ${isContentList ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'}`}>
                         <i className={`fas ${isContentList ? 'fa-file-lines' : 'fa-film'} text-sm sm:text-base`}></i>
                     </div>
                     {title}
                 </span>
-                <button onClick={refreshLists} className="p-1.5 sm:p-2 text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                <button onClick={refreshLists} className="p-1.5 sm:p-2 text-muted-foreground hover:text-foreground transition rounded-full hover:bg-secondary">
                     <i className={`fas fa-sync ${isLoading ? "animate-spin" : ""} text-sm sm:text-base`}></i>
                 </button>
             </h2>
 
             <div className="space-y-2 sm:space-y-3 overflow-y-auto custom-scrollbar flex-1 pr-1">
                 {isLoading ? (
-                    <div className="flex flex-col items-center justify-center py-8 sm:py-12 text-zinc-400">
-                        <i className="fas fa-circle-notch fa-spin text-xl sm:text-2xl mb-2 sm:mb-3"></i>
-                        <span className="text-xs sm:text-sm font-medium">Loading...</span>
+                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                        <i className="fas fa-circle-notch fa-spin text-2xl mb-3"></i>
+                        <span className="text-sm font-medium">Loading...</span>
                     </div>
                 ) : data.length === 0 ? (
-                    <div className="text-center py-8 sm:py-12 text-zinc-400 bg-zinc-50 dark:bg-zinc-900/50 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800">
-                        <i className="fas fa-inbox text-2xl sm:text-3xl mb-2 opacity-50"></i>
-                        <p className="text-xs sm:text-sm">No {isContentList ? 'content' : 'reels'} yet.</p>
+                    <div className="text-center py-12 text-muted-foreground bg-secondary/30 rounded-2xl border border-dashed border-border">
+                        <i className="fas fa-inbox text-3xl mb-2 opacity-50"></i>
+                        <p className="text-sm">No {isContentList ? 'content' : 'reels'} yet.</p>
                     </div>
                 ) : (
                     data.map((item, index) => (
-                        <div key={index} className="group flex justify-between items-center p-3 sm:p-4 rounded-xl bg-zinc-50 hover:bg-white border border-zinc-100 hover:border-zinc-200 dark:bg-zinc-900/30 dark:hover:bg-zinc-800 dark:border-zinc-800 transition-all shadow-sm hover:shadow-md">
+                        <div key={index} className="group flex justify-between items-center p-3 sm:p-4 rounded-xl bg-background hover:bg-secondary/50 border border-border hover:border-border/80 transition-all shadow-sm hover:shadow-md">
                             <div className="min-w-0 pr-4">
-                                <p className="font-semibold text-zinc-700 dark:text-zinc-200 truncate">{removeExtension(item.name)}</p>
-                                <div className="flex items-center gap-2 mt-1 text-xs text-zinc-400 font-medium">
+                                <p className="font-semibold text-foreground truncate">{removeExtension(item.name)}</p>
+                                <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground font-medium">
                                     <span>{formatTimestamp(item.modified)}</span>
                                     {isContentList ? (
-                                        <span className="bg-zinc-200 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-[10px] truncate max-w-[150px]">
+                                        <span className="bg-secondary px-2 py-0.5 rounded-full text-secondary-foreground truncate max-w-[150px]">
                                             {(item as ContentItem).query}
                                         </span>
                                     ) : (
-                                        <span className="bg-zinc-200 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-[10px]">
+                                        <span className="bg-secondary px-2 py-0.5 rounded-full text-secondary-foreground">
                                             {(item as ReelItem).size_kb.toFixed(1)} KB
                                         </span>
                                     )}
@@ -84,7 +83,7 @@ export const FileList: React.FC<FileListProps> = ({
                                     <>
                                         <button
                                             onClick={() => handleCaptionGeneration?.(item.name)}
-                                            className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition"
+                                            className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-amber-500 hover:bg-amber-100 dark:hover:bg-amber-900/20 transition"
                                             title="Generate Caption"
                                             disabled={isGenerating}
                                         >
@@ -92,7 +91,7 @@ export const FileList: React.FC<FileListProps> = ({
                                         </button>
                                         <button
                                             onClick={() => handleSingleReelGeneration?.(item.name)}
-                                            className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition"
+                                            className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-emerald-500 hover:bg-emerald-100 dark:hover:bg-emerald-900/20 transition"
                                             title="Generate Reel"
                                             disabled={isGenerating}
                                         >
@@ -100,7 +99,7 @@ export const FileList: React.FC<FileListProps> = ({
                                         </button>
                                         <button
                                             onClick={() => showDialogueModal?.(item as ContentItem)}
-                                            className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition"
+                                            className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-indigo-500 hover:bg-indigo-100 dark:hover:bg-indigo-900/20 transition"
                                             title="Edit Dialogue"
                                             disabled={isGenerating}
                                         >
@@ -108,7 +107,7 @@ export const FileList: React.FC<FileListProps> = ({
                                         </button>
                                         <button
                                             onClick={() => handleDeleteScript?.(item.name)}
-                                            className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition"
+                                            className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition"
                                             title="Delete Script"
                                             disabled={isGenerating}
                                         >
@@ -120,14 +119,14 @@ export const FileList: React.FC<FileListProps> = ({
                                         <a
                                             href={`${apiBaseUrl}/reels/${item.name}`}
                                             download
-                                            className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition"
+                                            className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-emerald-500 hover:bg-emerald-100 dark:hover:bg-emerald-900/20 transition"
                                             title="Download Video"
                                         >
                                             <i className="fas fa-download"></i>
                                         </a>
                                         <button
                                             onClick={() => showPreviewModal?.(`${apiBaseUrl}/reels/${item.name}`)}
-                                            className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition"
+                                            className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition"
                                             title="Preview Video"
                                             disabled={isGenerating}
                                         >
@@ -135,7 +134,7 @@ export const FileList: React.FC<FileListProps> = ({
                                         </button>
                                         <button
                                             onClick={() => handleDeleteReel?.(item.name)}
-                                            className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition"
+                                            className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition"
                                             title="Delete Reel"
                                             disabled={isGenerating}
                                         >

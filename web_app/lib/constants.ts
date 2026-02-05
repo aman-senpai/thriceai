@@ -1,18 +1,18 @@
 // src/lib/constants.ts
 import { ConfigData } from "../types"; // Adjusted import path
 
-// --- Modern Minimal Design Tokens (Zinc Theme) ---
+// --- Modern Minimal Design Tokens (Semantic Theme) ---
 export const GLASS_CARD =
-  "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300";
+  "bg-card text-card-foreground border border-border rounded-xl shadow-sm hover:shadow-md transition-all duration-300";
 export const CLEAN_INPUT =
-  "w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 transition-all font-medium text-zinc-800 dark:text-zinc-200 placeholder-zinc-400";
+  "w-full bg-background border border-border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-ring transition-all font-medium text-foreground placeholder-muted-foreground";
 export const ACTION_BUTTON =
   "w-full py-3.5 rounded-xl font-bold tracking-wide transition-all transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md flex justify-center items-center gap-2";
 
-export const BTN_PRIMARY = `${ACTION_BUTTON} bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200`;
-export const BTN_SECONDARY = `${ACTION_BUTTON} bg-white text-zinc-900 border border-zinc-200 hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-100 dark:border-zinc-800 dark:hover:bg-zinc-800`;
+export const BTN_PRIMARY = `${ACTION_BUTTON} bg-primary text-primary-foreground hover:bg-primary/90`;
+export const BTN_SECONDARY = `${ACTION_BUTTON} bg-secondary text-secondary-foreground hover:bg-secondary/80 border border-border`;
 export const BTN_SUCCESS = `${ACTION_BUTTON} bg-emerald-600 text-white hover:bg-emerald-700`;
-export const BTN_DANGER = `${ACTION_BUTTON} bg-rose-500 text-white hover:bg-rose-600`;
+export const BTN_DANGER = `${ACTION_BUTTON} bg-destructive text-destructive-foreground hover:bg-destructive/90`;
 
 // --- Legacy mappings for compatibility ---
 export const cardClasses = GLASS_CARD;
@@ -20,9 +20,9 @@ export const selectOrInputClasses = CLEAN_INPUT;
 export const primaryButtonClasses = BTN_PRIMARY;
 export const successButtonClasses = BTN_SUCCESS;
 export const dangerButtonClasses = BTN_DANGER;
-export const primaryBlue = "#18181b"; // zinc-900
+export const primaryBlue = "hsl(var(--primary))";
 export const successGreen = "#10b981";
-export const dangerRed = "#f43f5e";
+export const dangerRed = "hsl(var(--destructive))";
 
 // --- API Functions (moved from page.tsx) ---
 const API_BASE_URL =
@@ -53,13 +53,13 @@ export const fetchConfig = async (): Promise<ConfigData> => {
       ]),
     ),
     prompts: Object.fromEntries(
-      data.prompt_files.map((p: any) => [p.path, p.name]),
+      data.prompt_files.map((p: { path: string; name: string }) => [p.path, p.name]),
     ),
     max_query_length: 5000,
   };
 };
 
-export const postData = async (endpoint: string, payload: any) => {
+export const postData = async (endpoint: string, payload: Record<string, any>) => {
   const formData = new FormData();
   if (endpoint.includes("generate-content")) {
     formData.append("char_a_name", payload.char_a_name);

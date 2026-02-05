@@ -22,7 +22,7 @@ services:
       context: ./web_app # Path to the directory containing frontend/Dockerfile
     container_name: faceless_frontend
     ports:
-      - "3000:3000"
+      - "3031:3031"
     networks:
       - faceless_network
     depends_on:

@@ -19,10 +19,6 @@ export const useThemeManager = () => {
     // Apply initial class to the root HTML element
     if (typeof document !== "undefined") {
       document.documentElement.classList.toggle("dark", initialIsDark);
-      // Ensure the correct default BG is set based on the theme
-      document.documentElement.style.backgroundColor = initialIsDark
-        ? "rgb(9 9 11)"
-        : "rgb(250 250 250)";
     }
   }, []);
 
@@ -34,10 +30,6 @@ export const useThemeManager = () => {
       }
       if (typeof document !== "undefined") {
         document.documentElement.classList.toggle("dark", newIsDark);
-        // Zinc-950 for dark, Zinc-50 for light
-        document.documentElement.style.backgroundColor = newIsDark
-          ? "rgb(9 9 11)"
-          : "rgb(250 250 250)";
       }
       return newIsDark;
     });

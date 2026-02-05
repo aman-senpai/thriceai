@@ -117,7 +117,7 @@ export const FileList: React.FC<FileListProps> = ({
                                 ) : (
                                     <>
                                         <a
-                                            href={`${apiBaseUrl}/reels/${item.name}`}
+                                            href={`${apiBaseUrl}/api/data/reels/${item.name}`}
                                             download
                                             className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-emerald-500 hover:bg-emerald-100 dark:hover:bg-emerald-900/20 transition"
                                             title="Download Video"

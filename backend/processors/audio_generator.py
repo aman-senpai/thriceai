@@ -12,6 +12,9 @@ from moviepy.editor import AudioFileClip, concatenate_audioclips
 import whisper_timestamped as whisper 
 import re 
 
+# Global cache for the Whisper model
+_WHISPER_MODEL = None
+
 # Import necessary components from config
 # Import necessary components from config
 try:
@@ -214,7 +217,8 @@ def generate_multi_role_audio_multiprocess(ordered_turns: list, language_code: s
     
     # Determine number of threads based on config
     # For IO-bound tasks like API calls, we can use more threads than CPU cores
-    num_threads = TTS_PROCESS_CONFIG.get(tts_mode, DEFAULT_TTS_PROCESSES)
+    effective_mode_for_config = 'gemini' if tts_mode == 'default' else tts_mode
+    num_threads = TTS_PROCESS_CONFIG.get(effective_mode_for_config, DEFAULT_TTS_PROCESSES)
     
     # Only force 1 thread if specifically configured (e.g. strict rate limits), 
     # but theoretically Gemini/ElevenLabs handle concurrency fine on their end.
@@ -248,15 +252,23 @@ def generate_multi_role_audio_multiprocess(ordered_turns: list, language_code: s
     print(f"  > TTS Phase completed in {time.time() - start_time:.2f}s")
 
     # --- PHASE 2: SEQUENTIAL WHISPER TRANSCRIPTION ---
-    print(f"  > Loading Whisper model ({WHISPER_DEVICE}) once for all turns...")
+    print(f"  > Loading Whisper model ({WHISPER_DEVICE})...")
     
-    # Load model ONCE
-    try:
-        with suppress_output():
-            whisper_model = whisper.load_model("tiny", device=WHISPER_DEVICE)
-    except Exception as e:
-        print(f"Error loading Whisper model: {e}")
-        return None, []
+    global _WHISPER_MODEL
+    
+    # Load model ONCE per process (Caching)
+    if _WHISPER_MODEL is None:
+        try:
+            with suppress_output():
+                _WHISPER_MODEL = whisper.load_model("tiny", device=WHISPER_DEVICE)
+            print("  > Whisper model loaded and cached.")
+        except Exception as e:
+            print(f"Error loading Whisper model: {e}")
+            return None, []
+    else:
+        print("  > Using cached Whisper model.")
+
+    whisper_model = _WHISPER_MODEL
 
     all_word_data = []
     audio_clips = []

@@ -18,10 +18,10 @@ Generate an engaging, platform-ready caption based on the provided JSON conversa
 
 ## Hashtag Rules
 
-Add 8-12 hashtags after a line break:
-- 4-5 topic-specific tags based on the actual subject matter
-- 3-4 platform tags (#shorts #reels #fyp #viral)
-- 2-3 niche tags for discoverability
+Add 3-5 hashtags after a line break:
+- 1-2 topic-specific tags based on the actual subject matter
+- 1-2 platform tags (#shorts #reels #fyp)
+- 1 niche tag for discoverability
 
 ## Important Guidelines
 

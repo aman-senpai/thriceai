@@ -35,7 +35,7 @@ GEMINI_TTS_WAIT_SECONDS = 6.0
 # Default to 1 for services without a specific config
 DEFAULT_TTS_PROCESSES = 1 
 TTS_PROCESS_CONFIG = {
-    'gemini': 1,      # Limited to 1 due to API/rate constraints
+    'gemini': 3,      # Increased to 3 for parallel generation
     'elevenlabs': 2,  # Configured to 2
     'mac_say': 10     # Configured to 10
 }
@@ -47,7 +47,10 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
 
+
 INPUT_DIR = os.path.join(BASE_DIR, "contents")
+WEB_APP_OUT_DIR = os.path.join(BASE_DIR, "web_app", "out")
+
 VIDEO_DIR = os.path.join(DATA_DIR, "assets", "bg_videos")
 AVATAR_DIR = os.path.join(DATA_DIR, "assets", "avatars")
 OUTPUT_DIR = os.path.join(BASE_DIR, "reels")
@@ -68,7 +71,7 @@ OUTPUT_FILE = os.path.join(TEMP_DIR, "temp_reel_export.mp4")
 TARGET_W, TARGET_H = 1080, 1920 # Vertical 9:16
 VIDEO_PADDING_START = 0.5  # Seconds of silence at start
 VIDEO_PADDING_END = 0.5    # Seconds of silence at end
-FONT = os.path.join(DATA_DIR, "fonts", "Inter_24pt-ExtraBoldItalic.ttf.ttf") 
+FONT = os.path.join(DATA_DIR, "fonts", "ComicNeue-Bold.ttf") 
 FONT_SIZE = 105
 TEXT_COLOR = 'white'
 STROKE_COLOR = 'black'

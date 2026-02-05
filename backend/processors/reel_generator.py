@@ -10,6 +10,13 @@ import glob
 # Required for robust transparent PNG handling and flipping
 from PIL import Image # Pillow library
 import io # ADDED for in-memory image handling
+import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# Monkeypatch ANTIALIAS for moviepy compatibility
+if not hasattr(Image, 'ANTIALIAS'):
+    Image.ANTIALIAS = Image.Resampling.LANCZOS
+
 
 from moviepy.editor import (
     VideoFileClip,
@@ -81,7 +88,8 @@ class ReelGenerator:
         self.base_name = os.path.basename(input_json_path).replace('.json', '')
         self.final_reel_name = f"{self.base_name}.mp4"
         self.final_output_path = os.path.join(OUTPUT_DIR, self.final_reel_name)
-        self.temp_output_file = OUTPUT_FILE
+        self.final_output_path = os.path.join(OUTPUT_DIR, self.final_reel_name)
+        self.temp_output_file = os.path.join(TEMP_DIR, f"temp_reel_{uuid.uuid4()}.mp4")
         self.video_file = self._get_random_video_file()
     
     def _get_random_video_file(self):
@@ -114,26 +122,17 @@ class ReelGenerator:
 
         return clip.resize(scale_func)
 
-    def _create_text_clips(self, word_data_list):
-        """Create animated text clips for all words."""
-        text_clips = []
+    def _process_single_text_clip(self, word_data, offset):
+        """Helper to create a single text clip (for parallel execution)."""
+        word_text = word_data['word']
+        start_time_word = word_data['start']
+        end_time_word = word_data['end']
+        word_duration = end_time_word - start_time_word
         
-        if not word_data_list:
-            print("Error: No word data available to create captions.")
-            return []
-
-        # Content must be offset by VIDEO_PADDING_START
-        offset = VIDEO_PADDING_START
-
-        for word_data in word_data_list:
-            word_text = word_data['word'] 
-            start_time_word = word_data['start']
-            end_time_word = word_data['end']
-            word_duration = end_time_word - start_time_word
+        if word_duration < MIN_CLIP_DURATION:
+            return None
             
-            if word_duration < MIN_CLIP_DURATION:
-                continue
-                
+        try:
             txt_clip = TextClip(
                 word_text.upper(), 
                 fontsize=FONT_SIZE, 
@@ -149,8 +148,34 @@ class ReelGenerator:
             
             # Apply offset to start time
             animated_txt = animated_txt.set_start(start_time_word + offset).set_pos(CAPTION_POSITION)
+            return animated_txt
+        except Exception as e:
+            print(f"Error creating text clip for '{word_text}': {e}")
+            return None
+
+    def _create_text_clips(self, word_data_list):
+        """Create animated text clips for all words in parallel."""
+        text_clips = []
+        
+        if not word_data_list:
+            print("Error: No word data available to create captions.")
+            return []
+
+        # Content must be offset by VIDEO_PADDING_START
+        offset = VIDEO_PADDING_START
+        
+        # Parallelize text clip creation
+        # TextClip generation can be slow due to ImageMagick calls
+        with ThreadPoolExecutor() as executor:
+            futures = [
+                executor.submit(self._process_single_text_clip, word_data, offset)
+                for word_data in word_data_list
+            ]
             
-            text_clips.append(animated_txt)
+            for future in as_completed(futures):
+                result = future.result()
+                if result:
+                    text_clips.append(result)
         
         return text_clips
 
@@ -235,6 +260,42 @@ class ReelGenerator:
             print(f"Error creating PIP asset clip: {e}")
             return None
 
+    def _preprocess_avatar_image(self, source_path, flip, role):
+        """Helper to pre-process a single avatar image (resize/flip/save)."""
+        temp_file_name = f"avatar_{role}_{'flipped' if flip else 'orig'}_{os.path.basename(source_path)}"
+        final_avatar_path = os.path.join(TEMP_DIR, temp_file_name)
+        
+        # Check if already exists in temp (persistence across runs if needed, or just this run)
+        # For now, we assume we want to ensure it's fresh or strictly managed. 
+        # But if we parallelize, multiple calls might try to write.
+        # We should use a unique key or check existence carefully.
+        
+        key = (source_path, flip)
+        
+        try:
+            # 1. Open
+            img = Image.open(source_path)
+            
+            # 2. Resize
+            original_w, original_h = img.size
+            new_h = int((AVATAR_WIDTH / original_w) * original_h)
+            img = img.resize((AVATAR_WIDTH, new_h), Image.Resampling.LANCZOS)
+            
+            # 3. Flip
+            if flip:
+                img = img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+                
+            # 4. Convert
+            if img.mode != 'RGBA':
+                img = img.convert('RGBA')
+
+            img.save(final_avatar_path, 'PNG')
+            return key, final_avatar_path
+            
+        except Exception as e:
+             print(f"Error processing avatar image {source_path}: {e}")
+             return key, source_path # Fallback
+
     def _create_avatar_clips(self, word_data_list):
         """Create animated avatar clips based on the active speaker (role) using Pillow 
         for robust transparency and flipping."""
@@ -264,92 +325,83 @@ class ReelGenerator:
         # 3. Get speaker segments
         speaker_segments = self._get_speaker_segments(word_data_list)
         
-        # 4. Process and create avatar clip for each speaking segment
-        processed_avatar_paths = {} # Cache processed paths to reuse them
-
+        # 4. Identify Unique Processing Jobs
+        processing_jobs = {} # Key: (source_path, flip) -> role (just for naming)
+        
         for segment in speaker_segments:
             role = segment['role']
-            start = segment['start']
-            end = segment['end']
-            duration = end - start
-            
             character_config = CHARACTER_MAP.get(role) 
             layout_config = role_to_layout_map.get(role)
 
             if not character_config or not layout_config: continue
 
             avatar_file = character_config.get('avatar')
-            avatar_flip = layout_config['flip']
+            if not avatar_file: continue
+            
+            source_avatar_path = os.path.join(AVATAR_DIR, avatar_file)
+            if not os.path.exists(source_avatar_path): continue
+            
+            flip = layout_config['flip']
+            key = (source_avatar_path, flip)
+            
+            if key not in processing_jobs:
+                processing_jobs[key] = role # Store role for filename generation
+
+        # 5. Execute Processing in Parallel
+        processed_avatar_paths = {} 
+        
+        with ThreadPoolExecutor() as executor:
+            futures = [
+                executor.submit(self._preprocess_avatar_image, src, flip, role)
+                for (src, flip), role in processing_jobs.items()
+            ]
+            
+            for future in as_completed(futures):
+                key, path = future.result()
+                processed_avatar_paths[key] = path
+
+        # 6. Create Clips
+        for segment in speaker_segments:
+            role = segment['role']
+            start = segment['start']
+            end = segment['end']
+            duration = end - start
+            
+            character_config = CHARACTER_MAP.get(role)
+            layout_config = role_to_layout_map.get(role)
+            
+            if not character_config or not layout_config: continue
+            
+            avatar_file = character_config.get('avatar')
             avatar_pos_x = layout_config['pos_x']
+            flip = layout_config['flip']
             
-            if not avatar_file or avatar_pos_x is None: continue
+            if not avatar_file: continue
+            source_path = os.path.join(AVATAR_DIR, avatar_file)
+            
+            key = (source_path, flip)
+            final_avatar_path = processed_avatar_paths.get(key, source_path) # Fallback if missing
+            
+            # --- MOVIEPY CLIPPING ---
+            try:
+                # Load the pre-processed image 
+                avatar_clip = ImageClip(final_avatar_path, duration=duration)
                 
-            source_avatar_path = os.path.join(AVATAR_DIR, avatar_file) 
-            
-            if not os.path.exists(source_avatar_path):
-                print(f"Error: Avatar file not found at {source_avatar_path}. Skipping.")
-                continue
+                # Apply the continuous smoother speaking animation
+                animated_avatar = self._apply_avatar_speaking_animation(avatar_clip, duration)
 
-            # --- PILLOW PRE-PROCESSING FOR TRANSPARENCY AND FLIP ---
-            
-            # Create a unique key for the pre-processed image
-            key = (avatar_file, avatar_flip) 
-            
-            if key in processed_avatar_paths:
-                # Reuse the already processed image path
-                final_avatar_path = processed_avatar_paths[key]
-            else:
-                # Path to save the new pre-processed image in the temporary directory
-                temp_file_name = f"avatar_{role}_{'flipped' if avatar_flip else 'orig'}_{os.path.basename(avatar_file)}"
-                final_avatar_path = os.path.join(TEMP_DIR, temp_file_name)
+                # Apply start time offset
+                animated_avatar = animated_avatar.set_start(start + offset)
+
+                # Set position: anchor the bottom of the avatar to AVATAR_Y_POS
+                animated_avatar = animated_avatar.set_pos(
+                    (avatar_pos_x, AVATAR_Y_POS - animated_avatar.h), 
+                    relative=False 
+                )
                 
-                try:
-                    # 1. Open the original image
-                    img = Image.open(source_avatar_path)
-                    
-                    # 2. Resize to the target width (Pillow handles aspect ratio)
-                    original_w, original_h = img.size
-                    new_h = int((AVATAR_WIDTH / original_w) * original_h)
-                    
-                    # Use Image.LANCZOS for high-quality resizing
-                    img = img.resize((AVATAR_WIDTH, new_h), Image.Resampling.LANCZOS)
-                    
-                    # 3. Apply horizontal flip if required
-                    if avatar_flip:
-                        img = img.transpose(Image.FLIP_LEFT_RIGHT)
-                        
-                    # 4. Ensure it is RGBA (with Alpha) for transparency and save it
-                    if img.mode != 'RGBA':
-                        img = img.convert('RGBA')
-
-                    img.save(final_avatar_path, 'PNG')
-                    
-                    # Cache the path for reuse
-                    processed_avatar_paths[key] = final_avatar_path
-                    
-                except Exception as e:
-                    print(f"Error processing avatar image {avatar_file} with Pillow. Falling back to original path. Error: {e}")
-                    # Fallback to original image path
-                    final_avatar_path = source_avatar_path 
-
-            # --- MOVIEPY CLIPPING (loads the clean, pre-processed PNG) ---
-
-            # Load the pre-processed image 
-            avatar_clip = ImageClip(final_avatar_path, duration=duration)
-            
-            # Apply the continuous smoother speaking animation
-            animated_avatar = self._apply_avatar_speaking_animation(avatar_clip, duration)
-
-            # Apply start time offset
-            animated_avatar = animated_avatar.set_start(start + offset)
-
-            # Set position: anchor the bottom of the avatar to AVATAR_Y_POS
-            animated_avatar = animated_avatar.set_pos(
-                (avatar_pos_x, AVATAR_Y_POS - animated_avatar.h), 
-                relative=False 
-            )
-            
-            avatar_clips.append(animated_avatar)
+                avatar_clips.append(animated_avatar)
+            except Exception as e:
+                print(f"Error creating avatar clip for {role}: {e}")
             
         return avatar_clips
 
@@ -497,7 +549,7 @@ class ReelGenerator:
                     fps=30,
                     codec=VIDEO_CODEC, 
                     audio_codec="aac",
-                    temp_audiofile=os.path.join(TEMP_DIR, 'temp-audio.m4a'),
+                    temp_audiofile=os.path.join(TEMP_DIR, f'temp-audio-{uuid.uuid4()}.m4a'),
                     remove_temp=True,
                     threads=6,
                     preset='fast',
@@ -512,7 +564,9 @@ class ReelGenerator:
         except FileNotFoundError as e:
             print(f"\n❌ An error occurred: {e}")
         except Exception as e:
+            import traceback
             print(f"\n❌ An error occurred during video generation for {self.input_json_path}: {e}")
+            traceback.print_exc()
         
         finally:
              # Ensure temporary frames from WebP processing are also cleaned up if needed

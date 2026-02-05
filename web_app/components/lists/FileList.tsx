@@ -39,7 +39,7 @@ export const FileList: React.FC<FileListProps> = ({
         <div className="bg-card text-card-foreground p-5 sm:p-6 rounded-2xl shadow-sm border border-border h-full flex flex-col">
             <h2 className="text-lg sm:text-xl font-bold mb-4 sm:mb-6 text-foreground flex justify-between items-center">
                 <span className="flex items-center gap-2 sm:gap-3">
-                    <div className={`p-1.5 sm:p-2 rounded-lg ${isContentList ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'}`}>
+                    <div className={`w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl shrink-0 ${isContentList ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'}`}>
                         <i className={`fas ${isContentList ? 'fa-file-lines' : 'fa-film'} text-sm sm:text-base`}></i>
                     </div>
                     {title}

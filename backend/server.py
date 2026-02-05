@@ -101,13 +101,13 @@ original_stderr = sys.stderr
 try:
     # Assuming config.py now includes CAPTION_DIR
     try:
-        from .config import INPUT_DIR, PROMPTS_DIR, CHARACTER_MAP, TEMP_DIR, VIDEO_DIR, OUTPUT_DIR, CAPTION_DIR, AVATAR_DIR, PIP_DIR, CHARACTER_CONFIG_FILE
+        from .config import INPUT_DIR, PROMPTS_DIR, CHARACTER_MAP, TEMP_DIR, VIDEO_DIR, OUTPUT_DIR, CAPTION_DIR, AVATAR_DIR, PIP_DIR, CHARACTER_CONFIG_FILE, WEB_APP_OUT_DIR
         from .services.content_writer import generate_content
         from .services.caption_generator import generate_caption 
         from .processors.reel_generator import ReelGenerator 
     except ImportError:
         # Fallback for when running directly or PYTHONPATH is set to backend
-        from config import INPUT_DIR, PROMPTS_DIR, CHARACTER_MAP, TEMP_DIR, VIDEO_DIR, OUTPUT_DIR, CAPTION_DIR, AVATAR_DIR, PIP_DIR, CHARACTER_CONFIG_FILE
+        from config import INPUT_DIR, PROMPTS_DIR, CHARACTER_MAP, TEMP_DIR, VIDEO_DIR, OUTPUT_DIR, CAPTION_DIR, AVATAR_DIR, PIP_DIR, CHARACTER_CONFIG_FILE, WEB_APP_OUT_DIR
         from services.content_writer import generate_content
         from services.caption_generator import generate_caption 
         from processors.reel_generator import ReelGenerator 
@@ -177,6 +177,15 @@ app = FastAPI(title="Faceless Reel Generator API")
 app.mount("/reels", StaticFiles(directory=OUTPUT_DIR), name="reels")
 app.mount("/contents", StaticFiles(directory=INPUT_DIR), name="contents")
 app.mount("/avatars", StaticFiles(directory=AVATAR_DIR), name="avatars")
+
+# --- Static Frontend Serving ---
+# 1. Serve _next assets
+next_assets_dir = os.path.join(WEB_APP_OUT_DIR, "_next")
+if os.path.exists(next_assets_dir):
+    app.mount("/_next", StaticFiles(directory=next_assets_dir), name="next_assets")
+
+
+
 
 # --- Schemas and Global State ---
 
@@ -701,6 +710,52 @@ async def generate_batch_reels_api(request: BatchRequest):
     results = _process_reels(process_items, request.audio_mode)
     
     return {"message": "Batch generation finished.", "results": results}
+
+
+# --- Static Frontend Serving (Catch-All) ---
+# This MUST be defined AFTER all specific API routes to avoid intercepting them.
+
+# 2. Serve root index.html and other static files
+html_routes = ["/", "/studio", "/batch", "/files", "/log"] # Known client-side routes
+
+@app.get("/{full_path:path}")
+async def serve_spa_or_static(full_path: str):
+    """
+    Serves static files from WEB_APP_OUT_DIR or rewrites to index.html for SPA routes.
+    Prioritizes API routes (handled by FastAPI automatically before this catch-all).
+    """
+
+    # 0. API routes are already handled. If we are here, it's not an API match (mostly).
+    if full_path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="API endpoint not found")
+
+    # 1. Check if the file exists directly in the out directory (e.g., favicon.ico, robotic.svg)
+    file_path = os.path.join(WEB_APP_OUT_DIR, full_path)
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+         return FileResponse(file_path)
+    
+    # 2. Check if it is a known SPA route or root
+    # For a static export, 'studio' might point to 'studio.html' if configured that way, 
+    # but usually standard React SPA uses index.html for everything. 
+    # WITH output: 'export', Next.js generates:
+    #   - index.html
+    #   - studio.html (if studio is a page)
+    # Let's check if there is a corresponding .html file
+    
+    html_path = os.path.join(WEB_APP_OUT_DIR, f"{full_path}.html")
+    if os.path.exists(html_path):
+        return FileResponse(html_path)
+    
+    # 3. Fallback to index.html for root or unknown routes (SPA behavior)
+    index_path = os.path.join(WEB_APP_OUT_DIR, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+
+    # 4. If index.html is missing (build not done), return a helpful message
+    return JSONResponse(
+        status_code=404, 
+        content={"detail": "Frontend static build not found. Please run 'bun run build' in web_app/ or check configuration."}
+    )
 
 
 # --- Startup and Shutdown Hooks ---

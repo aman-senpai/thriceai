@@ -1034,7 +1034,7 @@ export default function Page() {
       />
 
       {/* Mobile Layout - Tab Content */}
-      <main className="flex-1 p-2 md:hidden overflow-y-auto">
+      <main className={`flex-1 p-2 md:hidden ${activeTab === 'log' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'}`}>
         {activeTab === 'batch' && (
           <div className="animate-fade-in h-[calc(100vh-180px)]">
             <BatchGenerator

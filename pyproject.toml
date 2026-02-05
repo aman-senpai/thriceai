@@ -33,7 +33,7 @@ dependencies = [
     "numpy==2.3.4",
     "openai==2.5.0",
     "openai-whisper==20250625",
-    "Pillow==9.5.0",
+    "Pillow==10.4.0",
     "proglog==0.1.12",
     "pydantic==2.12.3",
     "pydantic_core==2.41.4",

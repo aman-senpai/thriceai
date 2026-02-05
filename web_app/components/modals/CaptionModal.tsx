@@ -34,7 +34,26 @@ export const CaptionModal: React.FC<CaptionModalProps> = ({
                     value={captionContent}
                 />
                 <button
-                    onClick={() => navigator.clipboard.writeText(captionContent)}
+                    onClick={() => {
+                        if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+                            navigator.clipboard.writeText(captionContent)
+                                .catch(() => {
+                                    const textArea = document.createElement("textarea");
+                                    textArea.value = captionContent;
+                                    document.body.appendChild(textArea);
+                                    textArea.select();
+                                    document.execCommand('copy');
+                                    document.body.removeChild(textArea);
+                                });
+                        } else {
+                            const textArea = document.createElement("textarea");
+                            textArea.value = captionContent;
+                            document.body.appendChild(textArea);
+                            textArea.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(textArea);
+                        }
+                    }}
                     className="mt-4 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 w-full py-3 font-semibold rounded-xl flex items-center justify-center shadow-md transition"
                 >
                     <i className="fas fa-copy mr-2"></i> Copy to Clipboard

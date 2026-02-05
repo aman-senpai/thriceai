@@ -320,7 +320,8 @@ async def get_reel_file(filename: str):
     # NOTE: The Next.js frontend might need to stream this file directly
     return FileResponse(
         path=file_path, 
-        media_type='video/mp4' 
+        media_type='video/mp4',
+        filename=filename
     )
 
 

@@ -112,8 +112,36 @@ const VideoModals: React.FC<VideoModalsProps> = ({
                     </div>
                     <button
                         onClick={() => {
-                            if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                                navigator.clipboard.writeText(captionContent).then(() => log("Copied!", "success"));
+                            if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+                                navigator.clipboard.writeText(captionContent)
+                                    .then(() => log("Copied!", "success"))
+                                    .catch(() => {
+                                        // Fallback for failed clipboard API
+                                        const textArea = document.createElement("textarea");
+                                        textArea.value = captionContent;
+                                        document.body.appendChild(textArea);
+                                        textArea.select();
+                                        try {
+                                            document.execCommand('copy');
+                                            log("Copied (fallback)!", "success");
+                                        } catch (err) {
+                                            log("Failed to copy", "error");
+                                        }
+                                        document.body.removeChild(textArea);
+                                    });
+                            } else {
+                                // Direct fallback for missing clipboard API
+                                const textArea = document.createElement("textarea");
+                                textArea.value = captionContent;
+                                document.body.appendChild(textArea);
+                                textArea.select();
+                                try {
+                                    document.execCommand('copy');
+                                    log("Copied (fallback)!", "success");
+                                } catch (err) {
+                                    log("Failed to copy", "error");
+                                }
+                                document.body.removeChild(textArea);
                             }
                         }}
                         className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-lg font-bold shadow-sm transition-colors w-full"

@@ -4,8 +4,8 @@
 
 echo "🛑 Stopping server and client..."
 
-# Find PIDs on ports 8008 and 3031
-PIDS=$(lsof -ti:8008,3031)
+# Find PIDs on ports 8008 and 3031 (only listening processes)
+PIDS=$(lsof -ti:8008,3031 -sTCP:LISTEN)
 
 if [ -z "$PIDS" ]; then
   echo "✅ No services found running on ports 8008 or 3031."

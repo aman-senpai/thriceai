@@ -41,6 +41,7 @@ wheels/
 # 2. Web App (Next.js / Node / Bun)
 # ------------------------------------
 web_app/node_modules/
+node_modules/
 web_app/.next/
 web_app/out/
 web_app/build/
@@ -59,6 +60,7 @@ web_app/.env.production.local
 # Temporary processing directory
 temp/
 temp_files/
+data/audio_cache/
 
 # Outputs
 data/reels/*.mp4
@@ -71,7 +73,7 @@ data/reels/*.mp4
 
 # Generated Content (if you don't want to track generated JSONs)
 contents/*.json
-!contents/example.json 
+!contents/example.json
 # ^ Keep an example if one exists, or remove this line if you want to ignore all.
 
 # Generated Captions

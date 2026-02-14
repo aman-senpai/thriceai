@@ -9,7 +9,6 @@ import { BatchGenerator } from "@/components/generator/BatchGenerator";
 
 // Styling constants are now imported from @/lib/constants to ensure consistent theming
 
-
 // --- 1. Type Definitions (Preserved and Exported) ---
 interface CharacterDetails {
   avatar: string;
@@ -50,19 +49,40 @@ interface LogMessage {
   message: string;
 }
 
-import { fetchConfig, fetchData, postData, cardClasses, selectOrInputClasses, primaryButtonClasses, successButtonClasses, dangerButtonClasses } from "@/lib/constants";
+import {
+  fetchConfig,
+  fetchData,
+  postData,
+  cardClasses,
+  selectOrInputClasses,
+  primaryButtonClasses,
+  successButtonClasses,
+  dangerButtonClasses,
+} from "@/lib/constants";
 import { useThemeManager } from "@/hooks/useThemeManager";
 
 // --- Helper for sanitizing filename (Required for handleContentGeneration and display hint) ---
-const sanitizeFileName = (name: string) => name.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
+const sanitizeFileName = (name: string) =>
+  name.replace(/[^a-zA-Z0-9_]/g, "").toLowerCase();
 
-const API_BASE_URL = typeof window === 'undefined'
-  ? 'http://localhost:8008'
-  : `http://${window.location.hostname}:8008`;
+const API_BASE_URL =
+  typeof window === "undefined"
+    ? "http://localhost:8008"
+    : `http://${window.location.hostname}:8008`;
 
 // --- Reusable UI Components ---
 
-const BaseButton = ({ children, onClick, disabled, className = "" }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean; className?: string }) => (
+const BaseButton = ({
+  children,
+  onClick,
+  disabled,
+  className = "",
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  className?: string;
+}) => (
   <button
     onClick={onClick}
     disabled={disabled}
@@ -72,7 +92,19 @@ const BaseButton = ({ children, onClick, disabled, className = "" }: { children:
   </button>
 );
 
-const GenerateButton = ({ children, onClick, disabled, className = "", isSubmit = false }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean; className?: string, isSubmit?: boolean }) => (
+const GenerateButton = ({
+  children,
+  onClick,
+  disabled,
+  className = "",
+  isSubmit = false,
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  className?: string;
+  isSubmit?: boolean;
+}) => (
   <button
     onClick={onClick}
     disabled={disabled}
@@ -97,7 +129,19 @@ interface HeaderProps {
   toggleLog: () => void;
 }
 
-const Header = ({ refreshLists, isReelGenerating, isContentGenerating, isReelsLoading, isContentsLoading, isDark, toggleTheme, activeTab, setActiveTab, isLogVisible, toggleLog }: HeaderProps) => (
+const Header = ({
+  refreshLists,
+  isReelGenerating,
+  isContentGenerating,
+  isReelsLoading,
+  isContentsLoading,
+  isDark,
+  toggleTheme,
+  activeTab,
+  setActiveTab,
+  isLogVisible,
+  toggleLog,
+}: HeaderProps) => (
   <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border px-3 py-3 md:px-6 md:py-4 shrink-0 transition-all duration-300">
     <div className="flex justify-between items-center max-w-[1920px] mx-auto">
       <div className="flex items-center gap-3">
@@ -108,28 +152,30 @@ const Header = ({ refreshLists, isReelGenerating, isContentGenerating, isReelsLo
           <h1 className="text-lg md:text-xl font-black tracking-tight text-foreground leading-none">
             Reel Gen
           </h1>
-          <p className="text-[10px] md:text-xs text-muted-foreground font-medium hidden sm:block mt-0.5">Create content fast.</p>
+          <p className="text-[10px] md:text-xs text-muted-foreground font-medium hidden sm:block mt-0.5">
+            Create content fast.
+          </p>
         </div>
       </div>
       <div className="flex items-center gap-2">
         {/* Desktop Tab Navigation */}
         <div className="hidden md:flex bg-muted p-1 rounded-xl mr-4">
           <button
-            onClick={() => setActiveTab('studio')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'studio' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+            onClick={() => setActiveTab("studio")}
+            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === "studio" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
           >
             Studio
           </button>
           <button
-            onClick={() => setActiveTab('batch')}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'batch' ? 'bg-emerald-600 text-white shadow-sm' : 'text-muted-foreground hover:text-emerald-600'}`}
+            onClick={() => setActiveTab("batch")}
+            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === "batch" ? "bg-emerald-600 text-white shadow-sm" : "text-muted-foreground hover:text-emerald-600"}`}
           >
             Batch
           </button>
         </div>
 
         <button
-          onClick={() => setActiveTab('log')}
+          onClick={() => setActiveTab("log")}
           className="w-9 h-9 md:w-10 md:h-10 flex md:hidden items-center justify-center rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all active:scale-95"
           title="Terminal"
         >
@@ -137,7 +183,7 @@ const Header = ({ refreshLists, isReelGenerating, isContentGenerating, isReelsLo
         </button>
         <button
           onClick={toggleLog}
-          className={`hidden md:flex w-9 h-9 md:w-10 md:h-10 items-center justify-center rounded-xl transition-all active:scale-95 ${isLogVisible ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20' : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'}`}
+          className={`hidden md:flex w-9 h-9 md:w-10 md:h-10 items-center justify-center rounded-xl transition-all active:scale-95 ${isLogVisible ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" : "bg-secondary text-secondary-foreground hover:bg-secondary/80"}`}
           title="Toggle Terminal"
         >
           <i className="fas fa-terminal text-sm md:text-base"></i>
@@ -147,7 +193,9 @@ const Header = ({ refreshLists, isReelGenerating, isContentGenerating, isReelsLo
           className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all active:scale-95"
           title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
         >
-          <i className={`fas ${isDark ? "fa-sun" : "fa-moon"} text-sm md:text-base`}></i>
+          <i
+            className={`fas ${isDark ? "fa-sun" : "fa-moon"} text-sm md:text-base`}
+          ></i>
         </button>
         <button
           onClick={refreshLists}
@@ -155,35 +203,39 @@ const Header = ({ refreshLists, isReelGenerating, isContentGenerating, isReelsLo
           className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all active:scale-95 disabled:opacity-50"
           title="Refresh Lists"
         >
-          <i className={`fas fa-sync text-sm md:text-base ${isReelsLoading || isContentsLoading ? "animate-spin" : ""}`}></i>
+          <i
+            className={`fas fa-sync text-sm md:text-base ${isReelsLoading || isContentsLoading ? "animate-spin" : ""}`}
+          ></i>
         </button>
       </div>
     </div>
     {/* Mobile Tab Navigation (Unchanged) */}
     <nav className="flex gap-1 mt-3 md:hidden">
       {[
-        { id: 'studio', label: 'Studio', icon: 'fa-feather' },
-        { id: 'files', label: 'Files', icon: 'fa-folder' },
-        { id: 'log', label: 'Log', icon: 'fa-terminal' },
+        { id: "studio", label: "Studio", icon: "fa-feather" },
+        { id: "files", label: "Files", icon: "fa-folder" },
+        { id: "log", label: "Log", icon: "fa-terminal" },
       ].map((tab) => (
         <button
           key={tab.id}
           onClick={() => setActiveTab(tab.id)}
-          className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${activeTab === tab.id
-            ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20'
-            : 'bg-muted text-muted-foreground hover:text-foreground'
-            }`}
+          className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+            activeTab === tab.id
+              ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+              : "bg-muted text-muted-foreground hover:text-foreground"
+          }`}
         >
           <i className={`fas ${tab.icon}`}></i>
           {tab.label}
         </button>
       ))}
       <button
-        onClick={() => setActiveTab('batch')}
-        className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${activeTab === 'batch'
-          ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
-          : 'bg-muted text-muted-foreground hover:text-foreground'
-          }`}
+        onClick={() => setActiveTab("batch")}
+        className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+          activeTab === "batch"
+            ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
+            : "bg-muted text-muted-foreground hover:text-foreground"
+        }`}
       >
         <i className="fas fa-magic"></i>
         Batch
@@ -193,12 +245,18 @@ const Header = ({ refreshLists, isReelGenerating, isContentGenerating, isReelsLo
 );
 interface GenerateContentFormProps {
   config: ConfigData | null;
-  charA: string; setCharA: React.Dispatch<React.SetStateAction<string>>;
-  charB: string; setCharB: React.Dispatch<React.SetStateAction<string>>;
-  audioMode: string; setAudioMode: React.Dispatch<React.SetStateAction<string>>;
-  promptPath: string; setPromptPath: React.Dispatch<React.SetStateAction<string>>;
+  charA: string;
+  setCharA: React.Dispatch<React.SetStateAction<string>>;
+  charB: string;
+  setCharB: React.Dispatch<React.SetStateAction<string>>;
+  audioMode: string;
+  setAudioMode: React.Dispatch<React.SetStateAction<string>>;
+  promptPath: string;
+  setPromptPath: React.Dispatch<React.SetStateAction<string>>;
   query: string;
-  handleQueryChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  handleQueryChange: (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => void;
   fileName: string;
   handleFileNameChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   contentStatus: string;
@@ -215,57 +273,92 @@ interface GenerateContentFormProps {
 }
 
 // Helper for Character Cards - Compact Horizontal Scroll
-const CharacterScroll = ({ label, selected, onSelect, exclude, config, isContentGenerating }: { label: string, selected: string, onSelect: (v: string) => void, exclude?: string, config: ConfigData | null, isContentGenerating: boolean }) => (
+const CharacterScroll = ({
+  label,
+  selected,
+  onSelect,
+  exclude,
+  config,
+  isContentGenerating,
+}: {
+  label: string;
+  selected: string;
+  onSelect: (v: string) => void;
+  exclude?: string;
+  config: ConfigData | null;
+  isContentGenerating: boolean;
+}) => (
   <div className="space-y-2">
     <div className="flex items-center justify-between px-1">
-      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{label}</label>
-      {selected && <span className="text-xs text-foreground font-bold">{selected}</span>}
+      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+        {label}
+      </label>
+      {selected && (
+        <span className="text-xs text-foreground font-bold">{selected}</span>
+      )}
     </div>
     <div className="flex gap-2 overflow-x-auto py-2 custom-scrollbar -mx-1 px-2">
-      {config && Object.entries(config.characters).map(([key, char]) => {
-        const isSelected = selected === key;
-        const isExcluded = exclude === key;
+      {config &&
+        Object.entries(config.characters).map(([key, char]) => {
+          const isSelected = selected === key;
+          const isExcluded = exclude === key;
 
-        if (isExcluded) return null;
+          if (isExcluded) return null;
 
-        return (
-          <button
-            key={key}
-            type="button"
-            onClick={() => (!isExcluded && !isContentGenerating) && onSelect(key)}
-            className={`relative shrink-0 w-14 h-14 md:w-16 md:h-16 rounded-xl overflow-hidden transition-all duration-200 bg-muted ${isSelected
-              ? "ring-2 ring-primary shadow-lg scale-105"
-              : "opacity-70 hover:opacity-100 hover:scale-105 grayscale hover:grayscale-0"
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() =>
+                !isExcluded && !isContentGenerating && onSelect(key)
+              }
+              className={`relative shrink-0 w-14 h-14 md:w-16 md:h-16 rounded-xl overflow-hidden transition-all duration-200 bg-muted ${
+                isSelected
+                  ? "ring-2 ring-primary shadow-lg scale-105"
+                  : "opacity-70 hover:opacity-100 hover:scale-105 grayscale hover:grayscale-0"
               }`}
-          >
-            <img
-              src={char.avatar.startsWith('http') ? char.avatar : `${API_BASE_URL}${char.avatar}`}
-              alt={key}
-              className="w-full h-full object-cover"
-              loading="lazy"
-              onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${key}&background=random`; }}
-            />
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent py-1 px-1">
-              <p className="text-white font-bold text-[9px] leading-none truncate text-center">{key}</p>
-            </div>
-            {isSelected && (
-              <div className="absolute top-1 right-1 w-4 h-4 bg-primary rounded-full flex items-center justify-center shadow">
-                <i className="fas fa-check text-[8px] text-primary-foreground"></i>
+            >
+              <img
+                src={
+                  char.avatar.startsWith("http")
+                    ? char.avatar
+                    : `${API_BASE_URL}${char.avatar}`
+                }
+                alt={key}
+                className="w-full h-full object-cover"
+                loading="lazy"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src =
+                    `https://ui-avatars.com/api/?name=${key}&background=random`;
+                }}
+              />
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent py-1 px-1">
+                <p className="text-white font-bold text-[9px] leading-none truncate text-center">
+                  {key}
+                </p>
               </div>
-            )}
-          </button>
-        );
-      })}
+              {isSelected && (
+                <div className="absolute top-1 right-1 w-4 h-4 bg-primary rounded-full flex items-center justify-center shadow">
+                  <i className="fas fa-check text-[8px] text-primary-foreground"></i>
+                </div>
+              )}
+            </button>
+          );
+        })}
     </div>
   </div>
 );
 
 const GenerateContentForm = React.memo(function GenerateContentForm({
   config,
-  charA, setCharA,
-  charB, setCharB,
-  audioMode, setAudioMode,
-  promptPath, setPromptPath,
+  charA,
+  setCharA,
+  charB,
+  setCharB,
+  audioMode,
+  setAudioMode,
+  promptPath,
+  setPromptPath,
   query,
   handleQueryChange,
   fileName,
@@ -282,29 +375,37 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
   handlePipUpload,
   handleClearPipAsset,
 }: GenerateContentFormProps) {
-
   return (
-    <div id="config-section" className="bg-card text-card-foreground p-6 rounded-2xl shadow-sm border border-border flex flex-col h-full">
+    <div
+      id="config-section"
+      className="bg-card text-card-foreground p-6 rounded-2xl shadow-sm border border-border flex flex-col h-full"
+    >
       <div className="flex items-center gap-3 mb-6 shrink-0">
         <div className="w-10 h-10 bg-secondary rounded-xl text-secondary-foreground flex items-center justify-center shrink-0">
           <i className="fas fa-feather"></i>
         </div>
         <div>
           <h2 className="text-sm font-bold text-foreground">Studio/Script</h2>
-          <p className="text-[10px] text-muted-foreground">Choose actors & generate dialogue</p>
+          <p className="text-[10px] text-muted-foreground">
+            Choose actors & generate dialogue
+          </p>
         </div>
       </div>
 
       {/* Removed separate button section */}
 
-      <form onSubmit={handleContentGeneration} className="space-y-4 flex-1 flex flex-col overflow-hidden">
-
+      <form
+        onSubmit={handleContentGeneration}
+        className="space-y-4 flex-1 flex flex-col overflow-hidden"
+      >
         {/* Form Inputs & Button (Moved to Top) */}
         <div className="shrink-0 space-y-3">
           <div className="bg-secondary/30 rounded-xl p-4 border border-border space-y-3">
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest">Prompt Template</label>
+                <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                  Prompt Template
+                </label>
                 <button
                   type="button"
                   onClick={onAddPrompt}
@@ -315,29 +416,33 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
                 </button>
               </div>
               <div className="flex flex-wrap gap-2">
-                {config && Object.entries(config.prompts).map(([path, name]) => {
-                  const isSelected = promptPath === path;
-                  const displayName = name.replace(/\.[^/.]+$/, ""); // Drop file extension
+                {config &&
+                  Object.entries(config.prompts).map(([path, name]) => {
+                    const isSelected = promptPath === path;
+                    const displayName = name.replace(/\.[^/.]+$/, ""); // Drop file extension
 
-                  return (
-                    <button
-                      key={path}
-                      type="button"
-                      onClick={() => setPromptPath(path)}
-                      disabled={isConfigLoading || isContentGenerating}
-                      className={`px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-bold transition-all duration-200 border ${isSelected
-                        ? "bg-primary text-primary-foreground border-primary shadow-sm transform scale-105"
-                        : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
+                    return (
+                      <button
+                        key={path}
+                        type="button"
+                        onClick={() => setPromptPath(path)}
+                        disabled={isConfigLoading || isContentGenerating}
+                        className={`px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-bold transition-all duration-200 border ${
+                          isSelected
+                            ? "bg-primary text-primary-foreground border-primary shadow-sm transform scale-105"
+                            : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
                         }`}
-                    >
-                      {displayName}
-                    </button>
-                  );
-                })}
+                      >
+                        {displayName}
+                      </button>
+                    );
+                  })}
               </div>
             </div>
             <div>
-              <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Topic / Query</label>
+              <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">
+                Topic / Query
+              </label>
               <textarea
                 value={query}
                 onChange={(e) => handleQueryChange(e)}
@@ -349,7 +454,9 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
 
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
               <div className="md:col-span-3">
-                <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Filename</label>
+                <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">
+                  Filename
+                </label>
                 <input
                   type="text"
                   value={fileName}
@@ -360,32 +467,52 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
                 />
               </div>
               <div className="md:col-span-5">
-                <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Audio Mode</label>
+                <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">
+                  Audio Mode
+                </label>
                 <div className="flex flex-wrap gap-2">
-                  {config && Object.keys(config.audio_modes).map((mode) => {
-                    const isSelected = audioMode === mode;
-                    const displayName = mode.replace(/_/g, ' ');
+                  {config &&
+                    Object.keys(config.audio_modes).map((mode) => {
+                      const isSelected = audioMode === mode;
+                      const displayName = mode.replace(/_/g, " ");
 
-                    return (
-                      <button
-                        key={mode}
-                        type="button"
-                        onClick={() => setAudioMode(mode)}
-                        disabled={isConfigLoading || isContentGenerating}
-                        className={`px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-bold transition-all duration-200 border capitalize ${isSelected
-                          ? "bg-primary text-primary-foreground border-primary shadow-sm transform scale-105"
-                          : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
+                      return (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => setAudioMode(mode)}
+                          disabled={isConfigLoading || isContentGenerating}
+                          className={`px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-bold transition-all duration-200 border capitalize ${
+                            isSelected
+                              ? "bg-primary text-primary-foreground border-primary shadow-sm transform scale-105"
+                              : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
                           }`}
-                      >
-                        {displayName}
-                      </button>
-                    );
-                  })}
+                        >
+                          {displayName}
+                        </button>
+                      );
+                    })}
                 </div>
               </div>
               <div className="md:col-span-4">
-                <GenerateButton onClick={() => { }} disabled={!isConfigValid || isContentGenerating || isConfigLoading} isSubmit={true} className={`${primaryButtonClasses} !py-2.5 !text-xs`}>
-                  {isContentGenerating ? (<><i className="fas fa-spinner fa-spin mr-2"></i> Generating...</>) : (<><i className="fas fa-magic mr-1.5"></i> Generate Content</>)}
+                <GenerateButton
+                  onClick={() => {}}
+                  disabled={
+                    !isConfigValid || isContentGenerating || isConfigLoading
+                  }
+                  isSubmit={true}
+                  className={`${primaryButtonClasses} !py-2.5 !text-xs`}
+                >
+                  {isContentGenerating ? (
+                    <>
+                      <i className="fas fa-spinner fa-spin mr-2"></i>{" "}
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-magic mr-1.5"></i> Generate Content
+                    </>
+                  )}
                 </GenerateButton>
               </div>
             </div>
@@ -403,7 +530,9 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
           {/* Column 1: Character Selection */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1">Characters</h3>
+              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1">
+                Characters
+              </h3>
               <button
                 type="button"
                 onClick={onAddCharacter}
@@ -413,24 +542,44 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
                 <i className="fas fa-plus text-[10px]"></i>
               </button>
             </div>
-            <CharacterScroll label="Speaker 1" selected={charA} onSelect={setCharA} exclude={charB} config={config} isContentGenerating={isContentGenerating} />
+            <CharacterScroll
+              label="Speaker 1"
+              selected={charA}
+              onSelect={setCharA}
+              exclude={charB}
+              config={config}
+              isContentGenerating={isContentGenerating}
+            />
             <div className="flex items-center gap-3 px-1">
               <div className="h-px bg-border flex-1"></div>
-              <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">vs</span>
+              <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                vs
+              </span>
               <div className="h-px bg-border flex-1"></div>
             </div>
-            <CharacterScroll label="Speaker 2" selected={charB} onSelect={setCharB} exclude={charA} config={config} isContentGenerating={isContentGenerating} />
+            <CharacterScroll
+              label="Speaker 2"
+              selected={charB}
+              onSelect={setCharB}
+              exclude={charA}
+              config={config}
+              isContentGenerating={isContentGenerating}
+            />
           </div>
 
           {/* Column 2: PIP Asset Upload */}
           <div className="space-y-4">
-            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1">PIP Asset (Optional)</h3>
+            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1">
+              PIP Asset (Optional)
+            </h3>
             <div className="bg-secondary/30 rounded-xl p-4 border border-border h-[calc(100%-2rem)] flex flex-col justify-center">
               {pipAsset ? (
                 <div className="flex items-center justify-between bg-background p-3 rounded-lg border border-border">
                   <div className="flex items-center gap-2 min-w-0">
                     <i className="fas fa-file-image text-muted-foreground"></i>
-                    <span className="text-xs font-medium truncate text-foreground">{pipAsset}</span>
+                    <span className="text-xs font-medium truncate text-foreground">
+                      {pipAsset}
+                    </span>
                   </div>
                   <button
                     type="button"
@@ -456,19 +605,21 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
                     ) : (
                       <>
                         <i className="fas fa-cloud-upload-alt text-2xl text-muted-foreground group-hover:text-primary transition-colors"></i>
-                        <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">Click or drag upload</span>
+                        <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                          Click or drag upload
+                        </span>
                       </>
                     )}
                   </div>
                 </div>
               )}
               <p className="text-[10px] text-muted-foreground mt-3 leading-tight italic opacity-70">
-                * PIP (Picture-in-Picture) will be placed above captions in the final reel.
+                * PIP (Picture-in-Picture) will be placed above captions in the
+                final reel.
               </p>
             </div>
           </div>
         </div>
-
       </form>
     </div>
   );
@@ -500,19 +651,34 @@ const ReelGenerationSection = ({
         Build Reels
       </h2>
       {reelStatus && (
-        <span className="text-[10px] font-medium px-2 py-1 bg-secondary text-secondary-foreground rounded-lg max-w-[200px] truncate" title={reelStatus}>
+        <span
+          className="text-[10px] font-medium px-2 py-1 bg-secondary text-secondary-foreground rounded-lg max-w-[200px] truncate"
+          title={reelStatus}
+        >
           {reelStatus}
         </span>
       )}
     </div>
 
     <div className="flex gap-2">
-      <GenerateButton onClick={handleSessionReelGeneration} disabled={isReelGenerating || sessionCount <= 0 || !audioMode} className={primaryButtonClasses}>
-        {isReelGenerating && sessionCount > 0 ? <i className="fas fa-spinner fa-spin mr-2"></i> : null}
+      <GenerateButton
+        onClick={handleSessionReelGeneration}
+        disabled={isReelGenerating || sessionCount <= 0 || !audioMode}
+        className={primaryButtonClasses}
+      >
+        {isReelGenerating && sessionCount > 0 ? (
+          <i className="fas fa-spinner fa-spin mr-2"></i>
+        ) : null}
         <span id="generate-session-reels-btn">Session ({sessionCount})</span>
       </GenerateButton>
-      <GenerateButton onClick={handleAllReelGeneration} disabled={isReelGenerating || !audioMode} className={successButtonClasses}>
-        {isReelGenerating && sessionCount === 0 ? <i className="fas fa-spinner fa-spin mr-2"></i> : null}
+      <GenerateButton
+        onClick={handleAllReelGeneration}
+        disabled={isReelGenerating || !audioMode}
+        className={successButtonClasses}
+      >
+        {isReelGenerating && sessionCount === 0 ? (
+          <i className="fas fa-spinner fa-spin mr-2"></i>
+        ) : null}
         <span id="generate-all-reels-btn">All Files</span>
       </GenerateButton>
     </div>
@@ -526,7 +692,11 @@ interface LogSectionProps {
 }
 
 // Added explicit height constraint to LogSection container for safety
-const LogSection = ({ logMessages, refreshLists, onClose }: LogSectionProps) => (
+const LogSection = ({
+  logMessages,
+  refreshLists,
+  onClose,
+}: LogSectionProps) => (
   <div className="bg-card text-card-foreground p-4 rounded-2xl shadow-sm border border-border h-full flex flex-col min-h-0">
     <div className="flex justify-between items-center mb-3 shrink-0">
       <div className="flex items-center gap-2">
@@ -536,25 +706,44 @@ const LogSection = ({ logMessages, refreshLists, onClose }: LogSectionProps) => 
         <h2 className="text-xs font-bold text-foreground">Activity Log</h2>
       </div>
       <div className="flex items-center gap-1">
-        <button onClick={refreshLists} className="p-1 px-2 text-muted-foreground hover:text-foreground transition rounded hover:bg-secondary" title="Refresh">
+        <button
+          onClick={refreshLists}
+          className="p-1 px-2 text-muted-foreground hover:text-foreground transition rounded hover:bg-secondary"
+          title="Refresh"
+        >
           <i className="fas fa-sync text-xs"></i>
         </button>
         {onClose && (
-          <button onClick={onClose} className="p-1 px-2 text-muted-foreground hover:text-destructive transition rounded hover:bg-secondary" title="Close Panel">
+          <button
+            onClick={onClose}
+            className="p-1 px-2 text-muted-foreground hover:text-destructive transition rounded hover:bg-secondary"
+            title="Close Panel"
+          >
             <i className="fas fa-times text-xs"></i>
           </button>
         )}
       </div>
     </div>
     <div className="flex-1 overflow-y-auto custom-scrollbar font-mono text-[10px] p-3 bg-secondary/30 rounded-xl border border-border space-y-1.5 shadow-inner min-h-0 h-full max-h-full">
-      {logMessages.length === 0 && <span className="text-muted-foreground italic">System ready...</span>}
+      {logMessages.length === 0 && (
+        <span className="text-muted-foreground italic">System ready...</span>
+      )}
       {[...logMessages].reverse().map((log, idx) => (
         <div key={idx} className="flex gap-2 leading-tight">
-          <span className="text-muted-foreground shrink-0 select-none opacity-50">{log.timestamp}</span>
-          <span className={`${log.type === 'error' ? 'text-destructive font-bold' :
-            log.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' :
-              log.type === 'warn' ? 'text-amber-500' : 'text-foreground/80'
-            } break-words`}>
+          <span className="text-muted-foreground shrink-0 select-none opacity-50">
+            {log.timestamp}
+          </span>
+          <span
+            className={`${
+              log.type === "error"
+                ? "text-destructive font-bold"
+                : log.type === "success"
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : log.type === "warn"
+                    ? "text-amber-500"
+                    : "text-foreground/80"
+            } break-words`}
+          >
             {log.message}
           </span>
         </div>
@@ -583,7 +772,7 @@ export default function Page() {
   const [contentStatus, setContentStatus] = useState("");
   const [reelStatus, setReelStatus] = useState("");
   const [mounted, setMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState('studio'); // Mobile tab navigation
+  const [activeTab, setActiveTab] = useState("studio"); // Mobile tab navigation
 
   const [isConfigLoading, setIsConfigLoading] = useState(false);
   const [isReelsLoading, setIsReelsLoading] = useState(false);
@@ -596,23 +785,25 @@ export default function Page() {
 
   // Modal State
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState('');
+  const [previewUrl, setPreviewUrl] = useState("");
   const [isDialogueModalOpen, setIsDialogueModalOpen] = useState(false);
-  const [dialogueContent, setDialogueContent] = useState('');
-  const [dialogueFileName, setDialogueFileName] = useState('');
+  const [dialogueContent, setDialogueContent] = useState("");
+  const [dialogueFileName, setDialogueFileName] = useState("");
   const [isCaptionModalOpen, setIsCaptionModalOpen] = useState(false);
-  const [captionContent, setCaptionContent] = useState('');
-  const [captionFileName, setCaptionFileName] = useState('');
+  const [captionContent, setCaptionContent] = useState("");
+  const [captionFileName, setCaptionFileName] = useState("");
 
   // New Feature Modals
   const [isAddCharacterModalOpen, setIsAddCharacterModalOpen] = useState(false);
   const [isAddPromptModalOpen, setIsAddPromptModalOpen] = useState(false);
   const [isLogVisible, setIsLogVisible] = useState(false);
 
-
   const log = useCallback((message: string, type: LogType = "info") => {
     const now = new Date().toLocaleTimeString("en-US", { hour12: false });
-    setLogMessages((prev) => [...prev.slice(-500), { timestamp: now, type, message }]);
+    setLogMessages((prev) => [
+      ...prev.slice(-500),
+      { timestamp: now, type, message },
+    ]);
   }, []);
 
   // --- Data Fetching and Initialization ---
@@ -633,7 +824,10 @@ export default function Page() {
       setAudioMode(modeKeys[0] || "");
 
       // Default to blinked_thrice.txt if available, otherwise first prompt
-      const defaultPrompt = promptKeys.find(key => key.includes("blinked_thrice.txt")) || promptKeys[0] || "";
+      const defaultPrompt =
+        promptKeys.find((key) => key.includes("blinked_thrice.txt")) ||
+        promptKeys[0] ||
+        "";
       setPromptPath(defaultPrompt);
 
       log("Configuration loaded successfully.", "success");
@@ -647,12 +841,16 @@ export default function Page() {
   const refreshLists = useCallback(async () => {
     try {
       setIsReelsLoading(true);
-      const reelsData = await fetchData<{ reels: ReelItem[] }>("/api/data/reels");
+      const reelsData = await fetchData<{ reels: ReelItem[] }>(
+        "/api/data/reels",
+      );
       setReels(reelsData.reels);
       setIsReelsLoading(false);
 
       setIsContentsLoading(true);
-      const contentData = await fetchData<{ contents: ContentItem[] }>("/api/data/contents");
+      const contentData = await fetchData<{ contents: ContentItem[] }>(
+        "/api/data/contents",
+      );
       setContents(contentData.contents);
       setIsContentsLoading(false);
 
@@ -664,7 +862,10 @@ export default function Page() {
 
   const fetchPipAsset = useCallback(async () => {
     try {
-      const data = await fetchData<{ filename: string | null; exists: boolean }>("/api/data/pip-asset");
+      const data = await fetchData<{
+        filename: string | null;
+        exists: boolean;
+      }>("/api/data/pip-asset");
       setPipAsset(data.filename);
     } catch (err) {
       console.error("Failed to fetch PIP asset", err);
@@ -692,7 +893,9 @@ export default function Page() {
           setLogMessages((prev) => {
             // Avoid duplicates by checking if message already exists
             const isDuplicate = prev.some(
-              (l) => l.timestamp === logEntry.timestamp && l.message === logEntry.message
+              (l) =>
+                l.timestamp === logEntry.timestamp &&
+                l.message === logEntry.message,
             );
             if (isDuplicate) return prev;
             return [...prev.slice(-500), logEntry];
@@ -728,51 +931,69 @@ export default function Page() {
       query.trim().length > 0 &&
       !!fileName.trim() &&
       charA !== charB,
-    [charA, charB, audioMode, promptPath, query, fileName]
+    [charA, charB, audioMode, promptPath, query, fileName],
   );
 
-  const handleQueryChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setQuery(e.target.value);
-  }, []);
+  const handleQueryChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      setQuery(e.target.value);
+    },
+    [],
+  );
 
-  const handleFileNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setFileName(e.target.value);
-  }, []);
+  const handleFileNameChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setFileName(e.target.value);
+    },
+    [],
+  );
 
   // --- Handlers ---
-  const handleContentGeneration = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isConfigValid) return;
+  const handleContentGeneration = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!isConfigValid) return;
 
-    setIsContentGenerating(true);
-    setContentStatus("Processing...");
-    log("Generating content...", "info");
+      setIsContentGenerating(true);
+      setContentStatus("Processing...");
+      log("Generating content...", "info");
 
-    try {
-      const sanitizedFileName = sanitizeFileName(fileName);
+      try {
+        const sanitizedFileName = sanitizeFileName(fileName);
 
-      const payload = {
-        char_a_name: charA,
-        char_b_name: charB,
-        selected_prompt_path: promptPath,
-        query,
-        file_name: sanitizedFileName
-      };
+        const payload = {
+          char_a_name: charA,
+          char_b_name: charB,
+          selected_prompt_path: promptPath,
+          query,
+          file_name: sanitizedFileName,
+        };
 
-      const result = await postData("/api/generate-content", payload);
-      setContentStatus("✅ " + result.message);
-      log(result.message, "success");
-      setSessionCount(result.session_count);
-      setQuery("");
-      setFileName("");
-      refreshLists();
-    } catch (err: any) {
-      setContentStatus("❌ " + err.message);
-      log(err.message, "error");
-    } finally {
-      setIsContentGenerating(false);
-    }
-  }, [charA, charB, promptPath, query, fileName, log, isConfigValid, refreshLists]);
+        const result = await postData("/api/generate-content", payload);
+        setContentStatus("✅ " + result.message);
+        log(result.message, "success");
+        setSessionCount(result.session_count);
+        setQuery("");
+        setFileName("");
+        refreshLists();
+      } catch (err: any) {
+        setContentStatus("❌ " + err.message);
+        log(err.message, "error");
+      } finally {
+        setIsContentGenerating(false);
+      }
+    },
+    [
+      charA,
+      charB,
+      promptPath,
+      query,
+      fileName,
+      log,
+      isConfigValid,
+      refreshLists,
+    ],
+  );
 
   const handleSessionReelGeneration = async () => {
     const endpoint = "/api/generate-reels/session";
@@ -788,7 +1009,7 @@ export default function Page() {
       refreshLists();
       setSessionCount(result.session_count || 0);
     } catch (err: any) {
-      const errorMsg = err.message || 'API call failed.';
+      const errorMsg = err.message || "API call failed.";
       setReelStatus("❌ " + errorMsg);
       log(errorMsg, "error");
     } finally {
@@ -809,7 +1030,7 @@ export default function Page() {
       log(result.message, "success");
       refreshLists();
     } catch (err: any) {
-      const errorMsg = err.message || 'API call failed.';
+      const errorMsg = err.message || "API call failed.";
       setReelStatus("❌ " + errorMsg);
       log(errorMsg, "error");
     } finally {
@@ -821,19 +1042,25 @@ export default function Page() {
     const endpoint = "/api/generate-reel/single";
 
     if (isReelGenerating || !audioMode) {
-      log("Cannot generate: either already generating or no audio mode selected.", "warn");
+      log(
+        "Cannot generate: either already generating or no audio mode selected.",
+        "warn",
+      );
       return;
     }
     setIsReelGenerating(true);
     setReelStatus(`Processing ${filename}...`);
     log(`Generating reel for ${filename}...`, "info");
     try {
-      const result = await postData(endpoint, { filename, audio_mode: audioMode });
+      const result = await postData(endpoint, {
+        filename,
+        audio_mode: audioMode,
+      });
       setReelStatus("✅ " + result.message);
       log(result.message, "success");
       refreshLists();
     } catch (err: any) {
-      const errorMsg = err.message || 'API call failed.';
+      const errorMsg = err.message || "API call failed.";
       setReelStatus("❌ " + errorMsg);
       log(errorMsg, "error");
     } finally {
@@ -884,7 +1111,10 @@ export default function Page() {
 
     log(`Deleting script: ${filename}...`, "info");
     try {
-      const response = await fetch(`${API_BASE_URL}/api/delete-script/${filename}`, { method: "DELETE" });
+      const response = await fetch(
+        `${API_BASE_URL}/api/delete-script/${filename}`,
+        { method: "DELETE" },
+      );
       const result = await response.json();
       if (response.ok) {
         log(result.message, "success");
@@ -903,7 +1133,10 @@ export default function Page() {
 
     log(`Deleting reel: ${filename}...`, "info");
     try {
-      const response = await fetch(`${API_BASE_URL}/api/delete-reel/${filename}`, { method: "DELETE" });
+      const response = await fetch(
+        `${API_BASE_URL}/api/delete-reel/${filename}`,
+        { method: "DELETE" },
+      );
       const result = await response.json();
       if (response.ok) {
         log(result.message, "success");
@@ -930,7 +1163,10 @@ export default function Page() {
       };
 
       const result = await postData("/api/update-content", payload);
-      log(`Successfully saved changes to ${dialogueFileName}: ${result.message}`, "success");
+      log(
+        `Successfully saved changes to ${dialogueFileName}: ${result.message}`,
+        "success",
+      );
       refreshLists();
       hideDialogueModal();
     } catch (err: unknown) {
@@ -945,24 +1181,36 @@ export default function Page() {
   const handleCaptionGeneration = async (contentFileName: string) => {
     log(`Requesting caption for ${contentFileName}...`, "info");
     setCaptionFileName(contentFileName);
-    setCaptionContent('Generating caption...');
+    setCaptionContent("Generating caption...");
     setIsCaptionModalOpen(true);
 
     try {
-      const result = await postData(`/api/generate-caption/${contentFileName}`, {});
+      const result = await postData(
+        `/api/generate-caption/${contentFileName}`,
+        {},
+      );
 
       if (result && result.caption) {
         setCaptionContent(result.caption);
-        log(`Caption successfully generated for ${contentFileName}.`, "success");
+        log(
+          `Caption successfully generated for ${contentFileName}.`,
+          "success",
+        );
       } else {
-        const errorMsg = result.error || 'API failed to generate caption.';
+        const errorMsg = result.error || "API failed to generate caption.";
         setCaptionContent(`Error: ${errorMsg}`);
-        log(`Caption generation failed for ${contentFileName}: ${errorMsg}`, "error");
+        log(
+          `Caption generation failed for ${contentFileName}: ${errorMsg}`,
+          "error",
+        );
       }
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : 'Network error.';
+      const errorMsg = err instanceof Error ? err.message : "Network error.";
       setCaptionContent(`Error: ${errorMsg}`);
-      log(`Caption generation failed for ${contentFileName}: ${errorMsg}`, "error");
+      log(
+        `Caption generation failed for ${contentFileName}: ${errorMsg}`,
+        "error",
+      );
     }
   };
 
@@ -974,12 +1222,14 @@ export default function Page() {
 
   const hidePreviewModal = () => {
     setIsPreviewModalOpen(false);
-    setPreviewUrl('');
+    setPreviewUrl("");
   };
 
   const showDialogueModal = (item: ContentItem) => {
     setDialogueFileName(item.name);
-    const formattedDialogue = item.dialogues.map(d => `${d.speaker.toUpperCase()}: ${d.dialogue}`).join('\n\n');
+    const formattedDialogue = item.dialogues
+      .map((d) => `${d.speaker.toUpperCase()}: ${d.dialogue}`)
+      .join("\n\n");
     const content = `// Content Query: ${item.query}\n// File Path: ${item.path}\n// ----------------------------------\n\n${formattedDialogue}`;
     setDialogueContent(content);
     setIsDialogueModalOpen(true);
@@ -987,15 +1237,15 @@ export default function Page() {
 
   const hideDialogueModal = () => {
     setIsDialogueModalOpen(false);
-    setDialogueContent('');
-    setDialogueFileName('');
+    setDialogueContent("");
+    setDialogueFileName("");
   };
 
   const hideCaptionModal = () => {
     setIsCaptionModalOpen(false);
-    setCaptionContent('');
-    setCaptionFileName('');
-  }
+    setCaptionContent("");
+    setCaptionFileName("");
+  };
 
   const videoModalsProps: VideoModalsProps = {
     isPreviewModalOpen,
@@ -1018,7 +1268,7 @@ export default function Page() {
   if (!mounted) return null;
 
   return (
-    <div className="transition-colors duration-300 bg-zinc-100 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-200 min-h-screen flex flex-col">
+    <div className="transition-colors duration-300 bg-zinc-100 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-200 h-screen flex flex-col overflow-hidden">
       <Header
         refreshLists={refreshLists}
         isReelGenerating={isReelGenerating}
@@ -1034,8 +1284,10 @@ export default function Page() {
       />
 
       {/* Mobile Layout - Tab Content */}
-      <main className={`flex-1 p-2 md:hidden ${activeTab === 'log' ? 'overflow-hidden flex flex-col' : 'overflow-y-auto'}`}>
-        {activeTab === 'batch' && (
+      <main
+        className={`flex-1 p-2 md:hidden ${activeTab === "log" ? "overflow-hidden flex flex-col" : "overflow-y-auto"}`}
+      >
+        {activeTab === "batch" && (
           <div className="animate-fade-in h-[calc(100vh-180px)]">
             <BatchGenerator
               config={config}
@@ -1045,16 +1297,22 @@ export default function Page() {
             />
           </div>
         )}
-        {activeTab === 'studio' && (
+        {activeTab === "studio" && (
           <div className="space-y-3 animate-fade-in">
             <GenerateContentForm
               config={config}
-              charA={charA} setCharA={setCharA}
-              charB={charB} setCharB={setCharB}
-              audioMode={audioMode} setAudioMode={setAudioMode}
-              promptPath={promptPath} setPromptPath={setPromptPath}
-              query={query} handleQueryChange={handleQueryChange}
-              fileName={fileName} handleFileNameChange={handleFileNameChange}
+              charA={charA}
+              setCharA={setCharA}
+              charB={charB}
+              setCharB={setCharB}
+              audioMode={audioMode}
+              setAudioMode={setAudioMode}
+              promptPath={promptPath}
+              setPromptPath={setPromptPath}
+              query={query}
+              handleQueryChange={handleQueryChange}
+              fileName={fileName}
+              handleFileNameChange={handleFileNameChange}
               contentStatus={contentStatus}
               isConfigLoading={isConfigLoading}
               isContentGenerating={isContentGenerating}
@@ -1078,7 +1336,7 @@ export default function Page() {
             />
           </div>
         )}
-        {activeTab === 'files' && (
+        {activeTab === "files" && (
           <div className="space-y-3 animate-fade-in">
             <FileList
               title="Generated Scripts"
@@ -1106,12 +1364,9 @@ export default function Page() {
             />
           </div>
         )}
-        {activeTab === 'log' && (
+        {activeTab === "log" && (
           <div className="h-full animate-fade-in">
-            <LogSection
-              logMessages={logMessages}
-              refreshLists={refreshLists}
-            />
+            <LogSection logMessages={logMessages} refreshLists={refreshLists} />
           </div>
         )}
       </main>
@@ -1122,7 +1377,7 @@ export default function Page() {
           {/* Column 1: Studio/Script (Left) */}
           <section className="w-1/2 flex-1 flex flex-col gap-3 min-h-0 overflow-hidden">
             <div className="flex-1 min-h-0 overflow-hidden">
-              {activeTab === 'batch' ? (
+              {activeTab === "batch" ? (
                 <BatchGenerator
                   config={config}
                   log={log}
@@ -1132,12 +1387,18 @@ export default function Page() {
               ) : (
                 <GenerateContentForm
                   config={config}
-                  charA={charA} setCharA={setCharA}
-                  charB={charB} setCharB={setCharB}
-                  audioMode={audioMode} setAudioMode={setAudioMode}
-                  promptPath={promptPath} setPromptPath={setPromptPath}
-                  query={query} handleQueryChange={handleQueryChange}
-                  fileName={fileName} handleFileNameChange={handleFileNameChange}
+                  charA={charA}
+                  setCharA={setCharA}
+                  charB={charB}
+                  setCharB={setCharB}
+                  audioMode={audioMode}
+                  setAudioMode={setAudioMode}
+                  promptPath={promptPath}
+                  setPromptPath={setPromptPath}
+                  query={query}
+                  handleQueryChange={handleQueryChange}
+                  fileName={fileName}
+                  handleFileNameChange={handleFileNameChange}
                   contentStatus={contentStatus}
                   isConfigLoading={isConfigLoading}
                   isContentGenerating={isContentGenerating}
@@ -1152,7 +1413,7 @@ export default function Page() {
                 />
               )}
             </div>
-            {activeTab !== 'batch' && (
+            {activeTab !== "batch" && (
               <div className="shrink-0">
                 <ReelGenerationSection
                   handleSessionReelGeneration={handleSessionReelGeneration}
@@ -1202,7 +1463,7 @@ export default function Page() {
 
         {/* Collapsible Right Sidebar Terminal Section */}
         {isLogVisible && (
-          <section className="w-80 lg:w-96 shrink-0 bg-card border border-border rounded-2xl shadow-lg animate-in slide-in-from-right-5 duration-300 overflow-hidden">
+          <section className="w-80 lg:w-96 h-full shrink-0 bg-card border border-border rounded-2xl shadow-lg animate-in slide-in-from-right-5 duration-300 overflow-hidden">
             <LogSection
               logMessages={logMessages}
               refreshLists={refreshLists}

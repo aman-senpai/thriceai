@@ -1,6 +1,5 @@
 # main.py
 
-import asyncio
 import multiprocessing
 import os
 import shutil
@@ -9,8 +8,6 @@ import socket
 import subprocess
 import time
 import warnings
-from datetime import datetime
-from datetime import time as dt_time
 
 # --- IMPORTS for .ENV and TELEGRAM BOT ---
 from dotenv import load_dotenv
@@ -102,15 +99,15 @@ def get_local_ip():
 def check_static_build():
     """Checks if static build exists. If not, builds it."""
     print("--------------------------------------------------")
-    print(f"📦 Checking Frontend Build...")
+    print("📦 Checking Frontend Build...")
 
     index_path = os.path.join(WEB_APP_OUT_DIR, "index.html")
     if os.path.exists(WEB_APP_OUT_DIR) and os.path.exists(index_path):
         print(f"✅ Static build found at: {WEB_APP_OUT_DIR}")
-        print(f"   Skipping build step.")
+        print("   Skipping build step.")
         return
 
-    print(f"⚠️ Static build NOT found. Building now...")
+    print("⚠️ Static build NOT found. Building now...")
     print(f"   Running: {' '.join(FRONTEND_BUILD_COMMAND)}")
     print("--------------------------------------------------")
 
@@ -134,7 +131,7 @@ def check_static_build():
 def run_dev_server():
     """Starts the Next.js development server (blocking for multiprocessing)."""
     print("--------------------------------------------------")
-    print(f"🚀 Starting Next.js Dev Server (bun run dev)...")
+    print("🚀 Starting Next.js Dev Server (bun run dev)...")
     print(f"Access the Web UI at: {FRONTEND_URL.replace('8008', '3031')}")
     print("--------------------------------------------------")
     try:
@@ -195,7 +192,7 @@ def run_web_ui(headless: bool = False, dev_mode: bool = False):
 
     # 4. Start the Backend in a separate thread so we can listen for keyboard input
     print("\n" + "-" * 50)
-    print(f"📦 Starting FastAPI Backend...")
+    print("📦 Starting FastAPI Backend...")
     print(f"Backend API URL: {BACKEND_URL}")
     print(f"Network URL: http://{get_local_ip()}:8008")
     print("-" * 50)
@@ -204,9 +201,6 @@ def run_web_ui(headless: bool = False, dev_mode: bool = False):
     print("=" * 50 + "\n")
 
     import threading
-
-    # Event to signal shutdown
-    shutdown_event = threading.Event()
 
     def run_server_thread():
         """Run the uvicorn server in a thread."""

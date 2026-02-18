@@ -61,6 +61,7 @@ web_app/.env.production.local
 temp/
 temp_files/
 data/audio_cache/
+data/models/
 
 # Outputs
 data/reels/*.mp4

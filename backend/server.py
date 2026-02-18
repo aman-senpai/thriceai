@@ -101,13 +101,13 @@ original_stderr = sys.stderr
 try:
     # Assuming config.py now includes CAPTION_DIR
     try:
-        from .config import INPUT_DIR, PROMPTS_DIR, CHARACTER_MAP, TEMP_DIR, VIDEO_DIR, OUTPUT_DIR, CAPTION_DIR, AVATAR_DIR, PIP_DIR, CHARACTER_CONFIG_FILE, WEB_APP_OUT_DIR
+        from .config import INPUT_DIR, PROMPTS_DIR, CHARACTER_MAP, TEMP_DIR, VIDEO_DIR, OUTPUT_DIR, CAPTION_DIR, AVATAR_DIR, PIP_DIR, CHARACTER_CONFIG_FILE, WEB_APP_OUT_DIR, IS_MAC
         from .services.content_writer import generate_content
         from .services.caption_generator import generate_caption 
         from .processors.reel_generator import ReelGenerator 
     except ImportError:
         # Fallback for when running directly or PYTHONPATH is set to backend
-        from config import INPUT_DIR, PROMPTS_DIR, CHARACTER_MAP, TEMP_DIR, VIDEO_DIR, OUTPUT_DIR, CAPTION_DIR, AVATAR_DIR, PIP_DIR, CHARACTER_CONFIG_FILE, WEB_APP_OUT_DIR
+        from config import INPUT_DIR, PROMPTS_DIR, CHARACTER_MAP, TEMP_DIR, VIDEO_DIR, OUTPUT_DIR, CAPTION_DIR, AVATAR_DIR, PIP_DIR, CHARACTER_CONFIG_FILE, WEB_APP_OUT_DIR, IS_MAC
         from services.content_writer import generate_content
         from services.caption_generator import generate_caption 
         from processors.reel_generator import ReelGenerator 
@@ -239,7 +239,7 @@ async def get_config_data_api():
              api_character_map[name]["avatar"] = f"/avatars/{details['avatar']}"
 
     return {
-        "tts_modes": ['gemini', 'elevenlabs', 'mac_say'],
+        "tts_modes": ['gemini', 'elevenlabs', 'mac_say', 'kokoro'] if IS_MAC else ['gemini', 'elevenlabs', 'kokoro'],
         "prompt_files": get_prompt_files(),
         "characters": api_character_map, 
         "session_count": len(current_session_files)

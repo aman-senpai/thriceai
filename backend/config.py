@@ -37,6 +37,7 @@ TTS_PROCESS_CONFIG = {
     "gemini": 3,  # Increased to 3 for parallel generation
     "elevenlabs": 2,  # Configured to 2
     "mac_say": 10,  # Configured to 10
+    "kokoro": 2,  # Added support for Kokoro
 }
 
 
@@ -60,6 +61,11 @@ CAPTION_DIR = os.path.join(BASE_DIR, "contents", "captions")
 CAPTION_SYSTEM_PROMPT_PATH = os.path.join(
     DATA_DIR, "prompts", "captions", "blinked_thrice.txt"
 )
+
+# --- KOKORO MODEL CONFIGURATION ---
+KOKORO_MODEL_DIR = os.path.join(DATA_DIR, "models", "kokoro")
+KOKORO_MODEL_PATH = os.path.join(KOKORO_MODEL_DIR, "kokoro-v1.0.onnx")
+KOKORO_VOICES_PATH = os.path.join(KOKORO_MODEL_DIR, "voices-v1.0.bin")
 
 # Temporary files for processing
 TEMP_AIFF_PATH = os.path.join(TEMP_DIR, "temp_tts_audio_turn_{}.aiff")

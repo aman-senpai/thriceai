@@ -182,6 +182,12 @@ def _generate_tts_only(turn_index, turn, tts_mode, reel_name=None):
         text = re.sub(r"\[(?:serious|stern|angry)\]", ".", text, flags=re.IGNORECASE)
         # Strip any remaining unknown [emotion] tags
         text = re.sub(r"\[.*?\]", "", text).strip()
+
+        # Normalize numbers for Kokoro: remove commas and use "point" for decimals/fractions
+        # 1. Remove commas between digits (e.g., 100,000 -> 100000)
+        text = re.sub(r"(?<=\d),(?=\d)", "", text)
+        # 2. Replace dots between digits with " point " (e.g., 4.6 -> 4 point 6, 2.9.1 -> 2 point 9 point 1)
+        text = re.sub(r"(?<=\d)\.(?=\d)", " point ", text)
     
     # Strip [emotion] tags for mac_say since it doesn't support them
     # and would speak them literally (e.g. "open bracket disbelief close bracket")

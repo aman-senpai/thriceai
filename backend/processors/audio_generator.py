@@ -8,11 +8,8 @@ import shutil
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import whisper_timestamped as whisper
 from moviepy.editor import AudioFileClip, concatenate_audioclips
-
-# Global cache for the Whisper model
-_WHISPER_MODEL = None
+import whisper_timestamped as whisper
 
 # Import necessary components from config
 # Import necessary components from config
@@ -20,7 +17,6 @@ try:
     from ..config import (
         AUDIO_CACHE_DIR,
         CHARACTER_MAP,
-        # --- NEW IMPORTS ---
         DEFAULT_TTS_PROCESSES,
         GEMINI_TTS_WAIT_SECONDS,
         IS_MAC,
@@ -36,7 +32,6 @@ except ImportError:
     from config import (
         AUDIO_CACHE_DIR,
         CHARACTER_MAP,
-        # --- NEW IMPORTS ---
         DEFAULT_TTS_PROCESSES,
         GEMINI_TTS_WAIT_SECONDS,
         IS_MAC,
@@ -151,10 +146,16 @@ def get_voice_id_for_role(role, tts_mode):
 def _generate_tts_only(turn_index, turn, tts_mode, reel_name=None):
     """
     Generates audio file for a single turn and returns the path.
-    Does NOT run Whisper.
     """
     role = turn["role"]
     text = turn["text"]
+
+    effective_mode = "gemini" if tts_mode == "default" else tts_mode
+
+    # Strip [emotion] tags for mac_say since it doesn't support them
+    # and would speak them literally (e.g. "open bracket disbelief close bracket")
+    if effective_mode == "mac_say":
+        text = re.sub(r"\[.*?\]", "", text).strip()
 
     voice_id = get_voice_id_for_role(role, tts_mode)
 
@@ -166,8 +167,6 @@ def _generate_tts_only(turn_index, turn, tts_mode, reel_name=None):
 
     temp_audio_path = None
     service = None
-
-    effective_mode = "gemini" if tts_mode == "default" else tts_mode
 
     if effective_mode == "gemini":
         service = gemini_tts
@@ -268,13 +267,22 @@ def _generate_tts_only(turn_index, turn, tts_mode, reel_name=None):
         return None
 
 
+def _tokenize_text(text):
+    """Strips [emotion/direction] tags from script text and splits into words."""
+    # Remove anything in square brackets (e.g., [disbelief], [fast], [sarcastically])
+    cleaned = re.sub(r"\[.*?\]", "", text)
+    # Split on whitespace, filter empty strings
+    words = [w.strip() for w in cleaned.split() if w.strip()]
+    return words
+
+
 def generate_multi_role_audio_multiprocess(
     ordered_turns: list, language_code: str, tts_mode: str, reel_name=None
 ):
     """
     Optimized generation:
     1. Parallel TTS Generation (IO Bound) using ThreadPoolExecutor.
-    2. Sequential Whisper Transcription (CPU/GPU Bound) with single model load.
+    2. Script-based word timing (uses original text with proportional distribution).
     """
     print(f"\nSelected TTS Mode: {tts_mode.upper()}")
 
@@ -282,14 +290,11 @@ def generate_multi_role_audio_multiprocess(
     start_time = time.time()
 
     # Determine number of threads based on config
-    # For IO-bound tasks like API calls, we can use more threads than CPU cores
     effective_mode_for_config = "gemini" if tts_mode == "default" else tts_mode
     num_threads = TTS_PROCESS_CONFIG.get(
         effective_mode_for_config, DEFAULT_TTS_PROCESSES
     )
 
-    # Only force 1 thread if specifically configured (e.g. strict rate limits),
-    # but theoretically Gemini/ElevenLabs handle concurrency fine on their end.
     if num_threads < 1:
         num_threads = 1
 
@@ -298,7 +303,6 @@ def generate_multi_role_audio_multiprocess(
     tts_results = []
 
     with ThreadPoolExecutor(max_workers=num_threads) as executor:
-        # Submit all tasks
         future_to_turn = {
             executor.submit(
                 _generate_tts_only, i, turn, tts_mode, reel_name=reel_name
@@ -322,45 +326,36 @@ def generate_multi_role_audio_multiprocess(
 
     print(f"  > TTS Phase completed in {time.time() - start_time:.2f}s")
 
-    # --- PHASE 2: SEQUENTIAL WHISPER TRANSCRIPTION ---
-    print(f"  > Loading Whisper model ({WHISPER_DEVICE})...")
+    # --- PHASE 2: WHISPER TRANSCRIPTION FOR WORD TIMESTAMPS ---
+    print(f"  > Loading Whisper model ({WHISPER_DEVICE}) once for all turns...")
 
-    global _WHISPER_MODEL
-
-    # Load model ONCE per process (Caching)
-    if _WHISPER_MODEL is None:
-        try:
-            with suppress_output():
-                _WHISPER_MODEL = whisper.load_model("tiny", device=WHISPER_DEVICE)
-            print("  > Whisper model loaded and cached.")
-        except Exception as e:
-            print(f"Error loading Whisper model: {e}")
-            return None, []
-    else:
-        print("  > Using cached Whisper model.")
-
-    whisper_model = _WHISPER_MODEL
+    # Load model ONCE for all turns
+    try:
+        with suppress_output():
+            whisper_model = whisper.load_model("tiny", device=WHISPER_DEVICE)
+    except Exception as e:
+        print(f"Error loading Whisper model: {e}")
+        return None, []
 
     all_word_data = []
     audio_clips = []
     current_offset = 0.0
 
-    print("  > Starting transcription...")
+    print("  > Starting Whisper transcription...")
 
     for item in tts_results:
         turn_index = item["index"]
         audio_path = item["audio_path"]
         role = item["role"]
 
-        # 1. Transcribe
         try:
-            # For remote services/MacSay, ensure a common format if needed, but Whisper handles most.
+            # 1. Transcribe with Whisper to get word-level timestamps
             with suppress_output():
                 result = whisper.transcribe(
                     whisper_model, audio_path, language="en", verbose=False
                 )
 
-            # 2. Extract Word Data
+            # 2. Extract word data from Whisper result
             turn_word_data = []
             for segment in result["segments"]:
                 for word in segment["words"]:
@@ -373,7 +368,7 @@ def generate_multi_role_audio_multiprocess(
                         }
                     )
 
-            # 3. Apply Offset immediately
+            # 3. Apply offset for multi-turn concatenation
             for word in turn_word_data:
                 word["start"] += current_offset
                 word["end"] += current_offset
@@ -385,27 +380,6 @@ def generate_multi_role_audio_multiprocess(
             audio_clips.append(clip)
             current_offset += clip.duration
 
-            # Clean up file?
-            # MoviePy loads the file; if we delete it now, it might be fine if fully loaded into RAM?
-            # AudioFileClip DOES NOT load into RAM by default, it streams.
-            # So we MUST NOT delete the file until we are done with the clip or write the final one.
-            # However, `concatenate_audioclips` will need to read them.
-            # Strategy: Keep files until the end of this function where we concatenate?
-            # Actually, `concatenate_audioclips` creates a composed clip.
-            # We need to be careful. For safety in this script, we usually let OS/temp dir cleanup handle it,
-            # or delete after writing the FINAL audio.
-            # But the previous code deleted it immediately after loading AudioFileClip?
-            # "Clean up the file here, after MoviePy has loaded it" -> This implies MoviePy loaded it fully?
-            # AudioFileClip usually keeps a handle.
-            # Let's keep the files for now to be safe, or check if AudioFileClip reads fully.
-            # Reverting to previous behavior: if it worked before, AudioFileClip might be reading it?
-            # Actually, `concatenate_audioclips` just references them.
-            # To be safe, we will NOT delete them here. `reel_generator.py` cleans up `TEMP_DIR`?
-            # No, `reel_generator.py` cleans `temp_output_file` but maybe not these individual chunks.
-            # Let's verify `reel_generator` cleanup.
-            # It cleans `temp-audio.m4a`.
-            # Let's add a robust cleanup in `reel_generator` or just ignore for now as they are in `temp/`.
-
         except Exception as e:
             print(f"Error processing audio for turn {turn_index}: {e}")
             continue
@@ -415,18 +389,15 @@ def generate_multi_role_audio_multiprocess(
 
     final_audio_clip = concatenate_audioclips(audio_clips)
 
-    # 3. Final Time Normalization/Scaling to Eliminate Lag
+    # Normalize timestamps to match actual audio duration (eliminates drift)
     if all_word_data:
         true_duration = final_audio_clip.duration
         whisper_total_time = (
-            all_word_data[-1]["end"]
-            if all_word_data and "end" in all_word_data[-1]
-            else 0.0
+            all_word_data[-1]["end"] if all_word_data else 0.0
         )
 
         if whisper_total_time > 0 and abs(true_duration - whisper_total_time) > 0.1:
             scale_factor = true_duration / whisper_total_time
-            # print("-> Normalizing timestamps: Scaling by {:.4f}".format(scale_factor))
         else:
             scale_factor = 1.0
 
@@ -438,11 +409,10 @@ def generate_multi_role_audio_multiprocess(
 
 
 def filter_word_data(word_data_list):
-    """Filters out words that are too short to display and adjusts timestamps."""
+    """Filters out words that are too short to display."""
     filtered = []
 
-    # This regex attempts to skip words that are likely just punctuation/whisper noise.
-    # It requires at least one alphanumeric character.
+    # Require at least one alphanumeric character
     word_pattern = re.compile(r"[a-zA-Z0-9]")
 
     for word in word_data_list:
@@ -450,8 +420,6 @@ def filter_word_data(word_data_list):
             word["word"]
         ):
             filtered.append(word)
-        # else:
-        # print(f"Skipping short/empty word: {word['word']} ({word['end'] - word['start']:.3f}s)")
 
     return filtered
 

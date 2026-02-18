@@ -97,10 +97,15 @@ def initialize_gemini_client():
             return None
     return None
 
-# The pattern of initializing a global client isn't necessary and can be error-prone.
-# We'll rely on the key check in generate_audio.
-# GEMINI_CLIENT = initialize_gemini_client()
-# SERVICE_AVAILABLE = GEMINI_CLIENT is not None
+# --- Singleton Client ---
+_GEMINI_CLIENT = None
+
+def _get_client():
+    """Returns a cached Gemini client singleton to avoid re-initialization per call."""
+    global _GEMINI_CLIENT
+    if _GEMINI_CLIENT is None:
+        _GEMINI_CLIENT = genai.Client(api_key=os.environ.get(GEMINI_API_KEY_NAME))
+    return _GEMINI_CLIENT
 
 def is_service_available():
     """Checks if the Gemini client can be initialized (i.e., API key is set)."""
@@ -119,9 +124,7 @@ def generate_audio(text, voice_name, output_path, turn_index, voice_id=None):
 
     print(f"  > Gemini TTS: Generating audio for turn {turn_index} with voice '{voice_name}'.")
 
-    # Initialize client using the API key from environment variables
-    # We do this here as the key might be set dynamically after initialization check
-    client = genai.Client(api_key=os.environ.get(GEMINI_API_KEY_NAME))
+    client = _get_client()
 
     # --- Use the correct TTS API pattern ---
     contents = [

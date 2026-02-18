@@ -91,12 +91,18 @@ IS_MAC = platform.system() == "Darwin"
 if IS_MAC:
     # Use h264_videotoolbox for macOS hardware acceleration
     VIDEO_CODEC = "h264_videotoolbox"
-    # Use mps for macOS GPU acceleration in Whisper
-    WHISPER_DEVICE = "mps"
 else:
     # Linux/Windows configuration
     VIDEO_CODEC = "libx264"
-    # Use cpu or cuda if available (defaulting to cpu for safety, user can change if they have nvidia)
+
+# --- WHISPER DEVICE CONFIGURATION ---
+import torch
+
+if IS_MAC:
+    WHISPER_DEVICE = "mps"
+elif torch.cuda.is_available():
+    WHISPER_DEVICE = "cuda"
+else:
     WHISPER_DEVICE = "cpu"
 
 # --- AVATAR DISPLAY CONFIGURATION ---

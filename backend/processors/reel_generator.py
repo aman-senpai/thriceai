@@ -100,6 +100,19 @@ except ImportError:
     )
 
 
+# --- Font Cache ---
+_FONT_CACHE = {}
+
+def _get_font(size):
+    """Returns a cached ImageFont to avoid reloading from disk per word."""
+    if size not in _FONT_CACHE:
+        try:
+            _FONT_CACHE[size] = ImageFont.truetype(FONT, size)
+        except Exception:
+            _FONT_CACHE[size] = ImageFont.load_default()
+    return _FONT_CACHE[size]
+
+
 class ReelGenerator:
     """
     A class to manage the end-to-end process of generating an Instagram Reel
@@ -153,11 +166,7 @@ class ReelGenerator:
         temp_draw = ImageDraw.Draw(temp_img)
 
         def measure_text(text, size):
-            try:
-                font = ImageFont.truetype(FONT, size)
-            except:
-                font = ImageFont.load_default()
-
+            font = _get_font(size)
             bbox = temp_draw.textbbox(
                 (0, 0), text, font=font, stroke_width=STROKE_WIDTH
             )
@@ -562,14 +571,16 @@ class ReelGenerator:
             # 3. Filter Word Data
             word_data_list = filter_word_data(word_data_list)
 
-            # 4. Prepare Background Video
-            final_video_clip = self._prepare_video(required_caption_duration)
+            # 4-6. Prepare Background Video, Text Clips, and Avatar Clips IN PARALLEL
+            #       These stages are independent and can run concurrently.
+            with ThreadPoolExecutor(max_workers=3) as executor:
+                video_future = executor.submit(self._prepare_video, required_caption_duration)
+                text_future = executor.submit(self._create_text_clips, word_data_list)
+                avatar_future = executor.submit(self._create_avatar_clips, word_data_list)
 
-            # 5. Create Text Clips
-            text_clips = self._create_text_clips(word_data_list)
-
-            # 6. Create Avatar Clips
-            avatar_clips = self._create_avatar_clips(word_data_list)
+                final_video_clip = video_future.result()
+                text_clips = text_future.result()
+                avatar_clips = avatar_future.result()
 
             # 7.5 Create PIP Asset Clip (Optional)
             offset = VIDEO_PADDING_START
@@ -625,9 +636,12 @@ class ReelGenerator:
             final_clip = final_clip.set_audio(final_audio_clip)
 
             with suppress_output():
-                final_clip.write_videofile(
-                    self.temp_output_file,
-                    fps=30,
+                # Build ffmpeg params for browser compatibility
+                ffmpeg_params = ["-pix_fmt", "yuv420p", "-movflags", "+faststart"]
+
+                # Preset only applies to libx264, not hardware encoders
+                write_kwargs = dict(
+                    fps=24,
                     codec=VIDEO_CODEC,
                     audio_codec="aac",
                     temp_audiofile=os.path.join(
@@ -635,9 +649,13 @@ class ReelGenerator:
                     ),
                     remove_temp=True,
                     threads=6,
-                    preset="fast",
                     logger=None,
+                    ffmpeg_params=ffmpeg_params,
                 )
+                if VIDEO_CODEC == "libx264":
+                    write_kwargs["preset"] = "ultrafast"
+
+                final_clip.write_videofile(self.temp_output_file, **write_kwargs)
 
             # 10. Move to Final Location
             shutil.move(self.temp_output_file, self.final_output_path)

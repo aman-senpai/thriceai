@@ -3,24 +3,28 @@
         "avatar": "aman.png",
         "voice_gemini": "Rasalgethi",
         "voice_eleven": "KSsyodh37PbfWy29kPtx",
-        "voice_mac": "Aman"
+        "voice_mac": "Aman",
+        "voice_kokoro": "am_liam"
     },
     "Isha": {
         "avatar": "isha.png",
         "voice_gemini": "Sulafat",
         "voice_eleven": "RXe6OFmxoC0nlSWpuCDy",
-        "voice_mac": "Isha (Premium)"
+        "voice_mac": "Isha (Premium)",
+        "voice_kokoro": "af_sarah"
     },
     "Ethan": {
         "avatar": "ethan.png",
         "voice_gemini": "Schedar",
         "voice_eleven": "KSsyodh37PbfWy29kPtx",
-        "voice_mac": "Aman"
+        "voice_mac": "Aman",
+        "voice_kokoro": "am_eric"
     },
     "Kavya": {
         "avatar": "kavya.png",
         "voice_gemini": "Laomedeia",
         "voice_eleven": "RXe6OFmxoC0nlSWpuCDy",
-        "voice_mac": "Isha (Premium)"
+        "voice_mac": "Isha (Premium)",
+        "voice_kokoro": "af_bella"
     }
 }

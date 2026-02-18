@@ -115,6 +115,23 @@ except ImportError:
     mac_say_tts = MacSayServiceStub()
 
 
+try:
+    try:
+        from ..services import kokoro_tts
+    except ImportError:
+        import services.kokoro_tts as kokoro_tts
+except ImportError:
+
+    class KokoroServiceStub:
+        def is_service_available(self):
+            return False
+
+        def generate_audio(self, *args, **kwargs):
+            raise NotImplementedError("Kokoro service not implemented.")
+
+    kokoro_tts = KokoroServiceStub()
+
+
 # --- VOICE ID LOOKUP UTILITY ---
 def get_voice_id_for_role(role, tts_mode):
     """
@@ -131,6 +148,8 @@ def get_voice_id_for_role(role, tts_mode):
         voice_key = "voice_eleven"
     elif effective_mode == "mac_say":
         voice_key = "voice_mac"
+    elif effective_mode == "kokoro":
+        voice_key = "voice_kokoro"
     else:
         return None
 
@@ -152,6 +171,18 @@ def _generate_tts_only(turn_index, turn, tts_mode, reel_name=None):
 
     effective_mode = "gemini" if tts_mode == "default" else tts_mode
 
+    # Enhance Kokoro output by mapping emotion tags to punctuation
+    if effective_mode == "kokoro":
+        # Mapping common emotion tags to punctuation-based cues
+        text = re.sub(r"\[disbelief\]", "...?", text, flags=re.IGNORECASE)
+        text = re.sub(r"\[(?:confused|questioning)\]", "?", text, flags=re.IGNORECASE)
+        text = re.sub(r"\[(?:pause|thoughtful|hesitation)\]", "...", text, flags=re.IGNORECASE)
+        text = re.sub(r"\[(?:excited|surprised|shouting|happy)\]", "!!", text, flags=re.IGNORECASE)
+        text = re.sub(r"\[(?:interrupted|cutting off)\]", "—", text, flags=re.IGNORECASE)
+        text = re.sub(r"\[(?:serious|stern|angry)\]", ".", text, flags=re.IGNORECASE)
+        # Strip any remaining unknown [emotion] tags
+        text = re.sub(r"\[.*?\]", "", text).strip()
+    
     # Strip [emotion] tags for mac_say since it doesn't support them
     # and would speak them literally (e.g. "open bracket disbelief close bracket")
     if effective_mode == "mac_say":
@@ -180,6 +211,10 @@ def _generate_tts_only(turn_index, turn, tts_mode, reel_name=None):
         service = mac_say_tts
         temp_audio_path = TEMP_AIFF_PATH.format(turn_index)
         ext = ".aiff"
+    elif effective_mode == "kokoro":
+        service = kokoro_tts
+        temp_audio_path = TEMP_WAV_PATH.format(turn_index)
+        ext = ".wav"
     else:
         return None
 

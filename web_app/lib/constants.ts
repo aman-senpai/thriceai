@@ -25,7 +25,7 @@ export const successGreen = "#10b981";
 export const dangerRed = "hsl(var(--destructive))";
 
 // --- API Functions (moved from page.tsx) ---
-const API_BASE_URL =
+export const API_BASE_URL =
   typeof window === "undefined"
     ? "http://localhost:8008"
     : `http://${window.location.hostname}:8008`;
@@ -53,13 +53,19 @@ export const fetchConfig = async (): Promise<ConfigData> => {
       ]),
     ),
     prompts: Object.fromEntries(
-      data.prompt_files.map((p: { path: string; name: string }) => [p.path, p.name]),
+      data.prompt_files.map((p: { path: string; name: string }) => [
+        p.path,
+        p.name,
+      ]),
     ),
     max_query_length: 5000,
   };
 };
 
-export const postData = async (endpoint: string, payload: Record<string, any>) => {
+export const postData = async (
+  endpoint: string,
+  payload: Record<string, any>,
+) => {
   const formData = new FormData();
   if (endpoint.includes("generate-content")) {
     formData.append("char_a_name", payload.char_a_name);

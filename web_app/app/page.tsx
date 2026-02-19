@@ -6,6 +6,8 @@ import VideoModals, { VideoModalsProps } from "@/components/modals/VideoModals";
 import { AddCharacterModal } from "@/components/modals/AddCharacterModal";
 import { AddPromptModal } from "@/components/modals/AddPromptModal";
 import { BatchGenerator } from "@/components/generator/BatchGenerator";
+import { FeedSection, RSSVideo, FeedSectionProps } from "@/components/generator/FeedSection";
+import { EditChannelsModal } from "@/components/modals/EditChannelsModal";
 
 // Styling constants are now imported from @/lib/constants to ensure consistent theming
 
@@ -167,6 +169,12 @@ const Header = ({
             Studio
           </button>
           <button
+            onClick={() => setActiveTab("feed")}
+            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === "feed" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            Feed
+          </button>
+          <button
             onClick={() => setActiveTab("batch")}
             className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === "batch" ? "bg-emerald-600 text-white shadow-sm" : "text-muted-foreground hover:text-emerald-600"}`}
           >
@@ -213,17 +221,17 @@ const Header = ({
     <nav className="flex gap-1 mt-3 md:hidden">
       {[
         { id: "studio", label: "Studio", icon: "fa-feather" },
+        { id: "feed", label: "Feed", icon: "fa-rss" },
         { id: "files", label: "Files", icon: "fa-folder" },
         { id: "log", label: "Log", icon: "fa-terminal" },
       ].map((tab) => (
         <button
           key={tab.id}
           onClick={() => setActiveTab(tab.id)}
-          className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-            activeTab === tab.id
-              ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
-              : "bg-muted text-muted-foreground hover:text-foreground"
-          }`}
+          className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${activeTab === tab.id
+            ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+            : "bg-muted text-muted-foreground hover:text-foreground"
+            }`}
         >
           <i className={`fas ${tab.icon}`}></i>
           {tab.label}
@@ -231,11 +239,10 @@ const Header = ({
       ))}
       <button
         onClick={() => setActiveTab("batch")}
-        className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-          activeTab === "batch"
-            ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
-            : "bg-muted text-muted-foreground hover:text-foreground"
-        }`}
+        className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${activeTab === "batch"
+          ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
+          : "bg-muted text-muted-foreground hover:text-foreground"
+          }`}
       >
         <i className="fas fa-magic"></i>
         Batch
@@ -312,11 +319,10 @@ const CharacterScroll = ({
               onClick={() =>
                 !isExcluded && !isContentGenerating && onSelect(key)
               }
-              className={`relative shrink-0 w-14 h-14 md:w-16 md:h-16 rounded-xl overflow-hidden transition-all duration-200 bg-muted ${
-                isSelected
-                  ? "ring-2 ring-primary shadow-lg scale-105"
-                  : "opacity-70 hover:opacity-100 hover:scale-105 grayscale hover:grayscale-0"
-              }`}
+              className={`relative shrink-0 w-14 h-14 md:w-16 md:h-16 rounded-xl overflow-hidden transition-all duration-200 bg-muted ${isSelected
+                ? "ring-2 ring-primary shadow-lg scale-105"
+                : "opacity-70 hover:opacity-100 hover:scale-105 grayscale hover:grayscale-0"
+                }`}
             >
               <img
                 src={
@@ -427,11 +433,10 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
                         type="button"
                         onClick={() => setPromptPath(path)}
                         disabled={isConfigLoading || isContentGenerating}
-                        className={`px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-bold transition-all duration-200 border ${
-                          isSelected
-                            ? "bg-primary text-primary-foreground border-primary shadow-sm transform scale-105"
-                            : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
-                        }`}
+                        className={`px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-bold transition-all duration-200 border ${isSelected
+                          ? "bg-primary text-primary-foreground border-primary shadow-sm transform scale-105"
+                          : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
+                          }`}
                       >
                         {displayName}
                       </button>
@@ -447,7 +452,7 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
                 value={query}
                 onChange={(e) => handleQueryChange(e)}
                 placeholder="e.g. 'Philosophy of Java vs Python'"
-                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none min-h-[80px]"
+                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring custom-scrollbar min-h-[120px] max-h-[300px]"
                 disabled={isConfigLoading || isContentGenerating}
               />
             </div>
@@ -482,11 +487,10 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
                           type="button"
                           onClick={() => setAudioMode(mode)}
                           disabled={isConfigLoading || isContentGenerating}
-                          className={`px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-bold transition-all duration-200 border capitalize ${
-                            isSelected
-                              ? "bg-primary text-primary-foreground border-primary shadow-sm transform scale-105"
-                              : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
-                          }`}
+                          className={`px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-bold transition-all duration-200 border capitalize ${isSelected
+                            ? "bg-primary text-primary-foreground border-primary shadow-sm transform scale-105"
+                            : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
+                            }`}
                         >
                           {displayName}
                         </button>
@@ -496,7 +500,7 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
               </div>
               <div className="md:col-span-4">
                 <GenerateButton
-                  onClick={() => {}}
+                  onClick={() => { }}
                   disabled={
                     !isConfigValid || isContentGenerating || isConfigLoading
                   }
@@ -734,15 +738,14 @@ const LogSection = ({
             {log.timestamp}
           </span>
           <span
-            className={`${
-              log.type === "error"
-                ? "text-destructive font-bold"
-                : log.type === "success"
-                  ? "text-emerald-600 dark:text-emerald-400"
-                  : log.type === "warn"
-                    ? "text-amber-500"
-                    : "text-foreground/80"
-            } break-words`}
+            className={`${log.type === "error"
+              ? "text-destructive font-bold"
+              : log.type === "success"
+                ? "text-emerald-600 dark:text-emerald-400"
+                : log.type === "warn"
+                  ? "text-amber-500"
+                  : "text-foreground/80"
+              } break-words`}
           >
             {log.message}
           </span>
@@ -796,6 +799,7 @@ export default function Page() {
   // New Feature Modals
   const [isAddCharacterModalOpen, setIsAddCharacterModalOpen] = useState(false);
   const [isAddPromptModalOpen, setIsAddPromptModalOpen] = useState(false);
+  const [isEditChannelsModalOpen, setIsEditChannelsModalOpen] = useState(false);
   const [isLogVisible, setIsLogVisible] = useState(false);
 
   const log = useCallback((message: string, type: LogType = "info") => {
@@ -1297,6 +1301,28 @@ export default function Page() {
             />
           </div>
         )}
+        {activeTab === "feed" && (
+          <div className="animate-fade-in h-[calc(100vh-180px)] flex flex-col">
+            <div className="flex justify-between items-center mb-2 px-1">
+              <h2 className="text-xs font-black uppercase text-muted-foreground tracking-widest">Inspiration Feed</h2>
+              <button
+                onClick={() => setIsEditChannelsModalOpen(true)}
+                className="text-[10px] font-bold text-primary hover:underline"
+              >
+                Edit Channels
+              </button>
+            </div>
+            <FeedSection
+              onSelectTopic={(video, context) => {
+                setQuery(context);
+                setFileName(sanitizeFileName(video.title));
+                setActiveTab("studio");
+                log(`Selected topic from feed: ${video.title}`, "info");
+              }}
+              log={log}
+            />
+          </div>
+        )}
         {activeTab === "studio" && (
           <div className="space-y-3 animate-fade-in">
             <GenerateContentForm
@@ -1384,6 +1410,29 @@ export default function Page() {
                   refreshLists={refreshLists}
                   API_BASE_URL={API_BASE_URL}
                 />
+              ) : activeTab === "feed" ? (
+                <div className="h-full flex flex-col animate-fade-in">
+                  <div className="flex justify-between items-center mb-3">
+                    <h2 className="text-sm font-black uppercase text-muted-foreground tracking-widest">Inspiration Feed</h2>
+                    <button
+                      onClick={() => setIsEditChannelsModalOpen(true)}
+                      className="text-xs font-bold text-primary hover:underline"
+                    >
+                      <i className="fas fa-edit mr-1"></i> Edit Channels
+                    </button>
+                  </div>
+                  <div className="flex-1 min-h-0 bg-card border border-border rounded-2xl p-4 shadow-sm overflow-hidden">
+                    <FeedSection
+                      onSelectTopic={(video, context) => {
+                        setQuery(context);
+                        setFileName(sanitizeFileName(video.title));
+                        setActiveTab("studio");
+                        log(`Selected topic from feed: ${video.title}`, "info");
+                      }}
+                      log={log}
+                    />
+                  </div>
+                </div>
               ) : (
                 <GenerateContentForm
                   config={config}
@@ -1485,6 +1534,11 @@ export default function Page() {
         isOpen={isAddPromptModalOpen}
         onClose={() => setIsAddPromptModalOpen(false)}
         onSuccess={loadConfig}
+        log={log}
+      />
+      <EditChannelsModal
+        isOpen={isEditChannelsModalOpen}
+        onClose={() => setIsEditChannelsModalOpen(false)}
         log={log}
       />
     </div>

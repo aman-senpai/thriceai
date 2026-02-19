@@ -105,12 +105,14 @@ try:
         from .services.content_writer import generate_content
         from .services.caption_generator import generate_caption 
         from .processors.reel_generator import ReelGenerator 
+        from .services.rss_service import get_rss_service
     except ImportError:
         # Fallback for when running directly or PYTHONPATH is set to backend
         from config import INPUT_DIR, PROMPTS_DIR, CHARACTER_MAP, TEMP_DIR, VIDEO_DIR, OUTPUT_DIR, CAPTION_DIR, AVATAR_DIR, PIP_DIR, CHARACTER_CONFIG_FILE, WEB_APP_OUT_DIR, IS_MAC
         from services.content_writer import generate_content
         from services.caption_generator import generate_caption 
         from processors.reel_generator import ReelGenerator 
+        from services.rss_service import get_rss_service
 except ImportError as e:
     print(f"Error importing modules (Check config.py, services/, processors/): {e}")
     sys.exit(1)
@@ -710,6 +712,54 @@ async def generate_batch_reels_api(request: BatchRequest):
     results = _process_reels(process_items, request.audio_mode)
     
     return {"message": "Batch generation finished.", "results": results}
+
+# --- RSS Feed Endpoints ---
+
+@app.get("/api/rss/videos")
+async def get_rss_videos():
+    """Returns all videos from the configured RSS feeds."""
+    try:
+        service = get_rss_service()
+        videos = service.fetch_all_videos()
+        return {"videos": videos}
+    except Exception as e:
+        print(f"RSS Fetch Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/rss/transcript/{video_id}")
+async def get_rss_transcript(video_id: str):
+    """Returns the transcript for a given YouTube video ID."""
+    try:
+        service = get_rss_service()
+        transcript = service.get_transcript(video_id)
+        if not transcript:
+            raise HTTPException(status_code=404, detail="Transcript not found or available for this video.")
+        return {"transcript": transcript}
+    except Exception as e:
+        print(f"Transcript Fetch Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/rss/channels")
+async def get_rss_channels():
+    """Returns the list of configured RSS channels."""
+    from .config import DATA_DIR
+    channels_file = os.path.join(DATA_DIR, "rss_channels.json")
+    if not os.path.exists(channels_file):
+        return {"channels": []}
+    with open(channels_file, 'r') as f:
+        return {"channels": json.load(f)}
+
+@app.post("/api/rss/channels")
+async def update_rss_channels(channels: List[Dict[str, Any]]):
+    """Updates the RSS channels configuration."""
+    from .config import DATA_DIR
+    channels_file = os.path.join(DATA_DIR, "rss_channels.json")
+    try:
+        with open(channels_file, 'w') as f:
+            json.dump(channels, f, indent=4)
+        return {"message": "Channels updated successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save channels: {e}")
 
 
 # --- Static Frontend Serving (Catch-All) ---

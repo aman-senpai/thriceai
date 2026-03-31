@@ -1,13 +1,29 @@
-# Faceless Reel Generator
+# Faceless Reel Generator (Thrice AI)
 
-An automated tool to generate video reels using AI-generated content, complete with voiceovers, subtitles, and background videos.
+An advanced, fully automated tool to generate high-quality vertical video reels. By leveraging AI for scriptwriting, multi-engine text-to-speech, and automated video compilation (complete with subtitles, avatars, and PIP features), this project turns simple topics or YouTube RSS feeds into engaging content. You can interact with it via a local Next.js Web App dashboard or entirely through a secure Telegram Bot.
 
-## Project Workflow
+## Key Features
+
+- **AI Script Generation**: Automatically drafts contextual dialogue using Gemini AI.
+- **Multiple TTS Engines Supported**:
+  - **ElevenLabs**: High-quality, premium cloud voice cloning.
+  - **Gemini TTS**: Integrated cloud TTS from Google.
+  - **Kokoro**: Local, fast, ONNX-based open-source TTS.
+  - **macOS Native (`say`)**: Built-in, zero-dependency offline TTS for Mac users.
+- **Rich Video Compilation (MoviePy / FFmpeg)**:
+  - Dynamic overlay of animated subtitles with customizable fonts and stroke colors.
+  - Automated integration of Avatar images (bouncing animation when speaking).
+  - Picture-in-Picture (PIP) asset overlay support.
+  - Random stock video background selection and background music integration.
+- **Telegram Bot Interface**: Control the entire pipeline securely from your phone.
+- **Content Ingestion**: Capable of digesting YouTube RSS feeds for trending topics.
+
+## Project Architecture & Workflow
 
 ```mermaid
 graph TD
     A[User Input / YouTube RSS Feed] --> B[Gemini AI: Script Generation]
-    B --> C[TTS: ElevenLabs / Kokoro / mac_say]
+    B --> C[TTS: ElevenLabs / Kokoro / Gemini / mac_say]
     B --> D[Stock Background Videos / Gameplay]
     B --> I[Avatar & PIP Asset Selection]
     C --> E[Video Compiler: MoviePy / FFmpeg]
@@ -21,107 +37,96 @@ graph TD
 ## Prerequisites
 
 - **Python**: Version 3.12 or higher.
-- **Package Manager**: [uv](https://github.com/astral-sh/uv) (Recommended for faster dependency management) or `pip`.
+- **Package Manager**: [uv](https://github.com/astral-sh/uv) (Recommended) or `pip`.
 - **System Tools**:
-  - `FFmpeg`: Required for video processing.
-  - `ImageMagick`: Required for generating text captions on videos.
+  - `FFmpeg`: Essential for video processing.
+  - `ImageMagick`: Required by MoviePy for text/subtitle generations.
 
 ## Installation
 
 ### macOS
 
-1.  **Install System Dependencies** (using [Homebrew](https://brew.sh/)):
+1. **Install System Dependencies** (using Homebrew):
+   ```bash
+   brew install ffmpeg imagemagick
+   ```
+   *Note: Ensure the `MAGICK_HOME` environment variable is set or `convert`/`magick` is in your PATH.*
 
-    ```bash
-    brew install ffmpeg imagemagick
-    ```
+2. **Install `uv` (Recommended)**:
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
 
-    _Note: If you run into issues with ImageMagick and moviepy, ensure the `MAGICK_HOME` environment variable is set or that `convert` / `magick` is in your PATH._
+### Linux / Windows
+Install Python, FFmpeg, and ImageMagick via your OS package manager (`apt`, `dnf`, `choco`, etc.).
 
-2.  **Install `uv` (Optional but Recommended)**:
-    ```bash
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    ```
+### Project Setup
 
-### Linux (Fedora)
+1. **Clone the Repository**:
+   ```bash
+   git clone <repository_url>
+   cd thriceai
+   ```
 
-1.  **Install System Dependencies**:
-    You may need to enable RPM Fusion repositories for FFmpeg if not already enabled.
+2. **Install Python Dependencies**:
+   ```bash
+   uv sync
+   # OR: pip install -e .
+   ```
 
-    ```bash
-    sudo dnf install ffmpeg ImageMagick
-    ```
+3. **Setup Frontend (Optional for Dashboard)**:
+   ```bash
+   cd web_app
+   bun install
+   ```
 
-    To ensure you have necessary headers for building Python packages (like Pillow or others if wheels are unavailable):
+4. **Prepare Local Assets (Required Directories)**:
+   Ensure you place your local models and media in the `data/` directory:
+   - `data/assets/bg_videos/`: Drop your background MP4s here.
+   - `data/assets/avatars/`: PNG avatars for characters.
+   - `data/models/kokoro/`: (If using Kokoro) Place `kokoro-v1.0.onnx` and `voices-v1.0.bin` here.
+   - `data/fonts/`: Place your `Inter_28pt-ExtraBold.ttf` or preferred fonts.
 
-    ```bash
-    sudo dnf groupinstall "Development Tools"
-    sudo dnf install python3-devel libjpeg-devel zlib-devel
-    ```
+## Configuration (.env)
 
-    _Note: Depending on your Fedora version, `ImageMagick` might be named `ImageMagick-devel` if you need development headers, but the binary is usually sufficient for MoviePy._
+Create a `.env` file in the root directory. Configure only what you need:
 
-2.  **Install `uv` (Optional but Recommended)**:
-    ```bash
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    ```
+```ini
+# --- LLM API Keys ---
+GEMINI_API_KEY=your_gemini_api_key_here
+CLAUDE=your_claude_api_key_here
 
-## Setup
+# --- TTS Providers ---
+ELEVEN_API=your_elevenlabs_api_key_here
 
-1.  **Clone the Repository**:
-
-    ```bash
-    git clone <repository_url>
-    cd faceless_project
-    ```
-
-2.  **Environment Configuration**:
-    Create a `.env` file in the root directory. You can use the example below or copy from a provided template if available.
-
-    **Required Variables**:
-
-    ```ini
-    ELEVEN_API=your_elevenlabs_api_key
-    GEMINI_API_KEY=your_gemini_api_key
-    ```
-
-    _Add other keys as found in `backend/config.py` if necessary._
-
-3.  **Install Python Dependencies**:
-    Using `uv`:
-
-    ```bash
-    uv sync
-    ```
-
-    Or using `pip`:
-
-    ```bash
-    pip install -e .
-    ```
-
-4.  **Setup Frontend**:
-    ```bash
-    cd web_app
-    bun install
-    ```
+# --- Telegram Bot Configuration ---
+TELEGRAM_BOT=your_telegram_bot_token_here
+TELEGRAM_CHAT_ID=@your_channel_or_chat_id
+# CRITICAL: Comma-separated Telegram User IDs allowed to use bot commands
+AUTHORIZED_TELEGRAM_USERS=123456789,987654321
+```
 
 ## Usage
 
-To start the backend:
+### 1. Telegram Bot (Recommended)
+The bot provides a secure, remote interface for the generation pipeline:
+1. Start the backend: `uv run run.py`
+2. Message your bot on Telegram:
+   - `/help`: List all commands.
+   - `/script <topic> <filename>`: Generate a script.
+   - `/generate <filename> [audio_mode]`: Generate a reel from a script. Supported audio modes: `gemini`, `elevenlabs`, `mac_say`.
+   - `/reel <topic>`: **Full Auto Mode** (Script -> Reel -> Caption -> Telegram Upload).
+   - `/status`: Check generation progress.
 
-```bash
-uv run run.py
-```
-
-To start the frontend:
-
-```bash
-cd web_app
-bun run dev
-```
-
-The application will start, and you see the output indicating the local URL (usually `http://0.0.0.0:8008` or similar).
+### 2. Local Web Dashboard
+For local visual management:
+1. Start the Backend: `uv run run.py` (Hosts API on Port 8008)
+2. Start the Frontend:
+   ```bash
+   cd web_app
+   bun run dev
+   ```
+3. Open `http://localhost:3031` (or local IP) in your browser.
 
 ## Screenshots
 
@@ -140,10 +145,10 @@ The application will start, and you see the output indicating the local URL (usu
 ![Batch generator](mics/img/Batch%20generator.png)
 *Batch generation of reels.*
 
-![Terminal evnet streaming](mics/img/Terminal%20evnet%20streaming.png)
+![Terminal event streaming](mics/img/Terminal%20evnet%20streaming.png)
 *Real-time updates during the generation process.*
 
-![Indivual video generation per script](mics/img/Indivual%20video%20generation%20per%20script.png)
+![Individual video generation per script](mics/img/Indivual%20video%20generation%20per%20script.png)
 *Monitoring individual video generation tasks.*
 
 ### Components & Insights
@@ -153,7 +158,6 @@ The application will start, and you see the output indicating the local URL (usu
 ![insights](mics/img/insights.png)
 *Post-generation insights and analytics.*
 
-## Notes
-
-- **Policy**: The `ImageMagick` security policy might block the use of the `@` symbol (needed for reading text files). If you encounter errors, you may need to edit `/etc/ImageMagick-6/policy.xml` (location varies) to allow reading text files.
-- **Font**: Ensure the font specified in `backend/config.py` exists, or the script may fail or fallback to a default font.
+## Troubleshooting & Notes
+- **ImageMagick Policy Error**: If ImageMagick blocks `@` symbols (needed for text files), edit `/etc/ImageMagick-6/policy.xml` (location varies) to allow reading `.txt` files.
+- **Missing Fonts**: Ensure the font paths in `backend/config.py` correctly point to existing `.ttf` files in your `data/fonts/` directory.

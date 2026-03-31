@@ -6,11 +6,13 @@ An automated tool to generate video reels using AI-generated content, complete w
 
 ```mermaid
 graph TD
-    A[User Input / Topic] --> B[Gemini AI: Script Generation]
-    B --> C[ElevenLabs: Voiceover Audio]
-    B --> D[Stock Footage & Wikipedia Images]
+    A[User Input / YouTube RSS Feed] --> B[Gemini AI: Script Generation]
+    B --> C[TTS: ElevenLabs / Kokoro / mac_say]
+    B --> D[Stock Background Videos / Gameplay]
+    B --> I[Avatar & PIP Asset Selection]
     C --> E[Video Compiler: MoviePy / FFmpeg]
     D --> E
+    I --> E
     E --> F[Subtitles / Captions Overlay]
     F --> G[Background Music Integration]
     G --> H[Final Generated Reel .mp4]

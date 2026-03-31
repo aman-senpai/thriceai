@@ -2,6 +2,20 @@
 
 An automated tool to generate video reels using AI-generated content, complete with voiceovers, subtitles, and background videos.
 
+## Project Workflow
+
+```mermaid
+graph TD
+    A[User Input / Topic] --> B[Gemini AI: Script Generation]
+    B --> C[ElevenLabs: Voiceover Audio]
+    B --> D[Stock Footage & Wikipedia Images]
+    C --> E[Video Compiler: MoviePy / FFmpeg]
+    D --> E
+    E --> F[Subtitles / Captions Overlay]
+    F --> G[Background Music Integration]
+    G --> H[Final Generated Reel .mp4]
+```
+
 ## Prerequisites
 
 - **Python**: Version 3.12 or higher.
@@ -106,6 +120,36 @@ bun run dev
 ```
 
 The application will start, and you see the output indicating the local URL (usually `http://0.0.0.0:8008` or similar).
+
+## Screenshots
+
+### Main Dashboard & Generation Workflow
+![Modes, feed and batch generation](file:///Users/senpai/Developer/thriceai/mics/img/Modes%2C%20feed%20and%20batch%20generation.png)
+*Initial view showing feed and batch generation modes.*
+
+### Script Generation
+![Script generation input](file:///Users/senpai/Developer/thriceai/mics/img/Script%20generation%20input.png)
+*Input interface for script generation.*
+
+![Generate Script component](file:///Users/senpai/Developer/thriceai/mics/img/Generate%20Script%20component.png)
+*The system generating a script based on user input.*
+
+### Video Generation & Monitoring
+![Batch generator](file:///Users/senpai/Developer/thriceai/mics/img/Batch%20generator.png)
+*Batch generation of reels.*
+
+![Terminal evnet streaming](file:///Users/senpai/Developer/thriceai/mics/img/Terminal%20evnet%20streaming.png)
+*Real-time updates during the generation process.*
+
+![Indivual video generation per script](file:///Users/senpai/Developer/thriceai/mics/img/Indivual%20video%20generation%20per%20script.png)
+*Monitoring individual video generation tasks.*
+
+### Components & Insights
+![character and pip addition component](file:///Users/senpai/Developer/thriceai/mics/img/character%20and%20pip%20addition%20component.png)
+*Adding visual components like characters and PIP.*
+
+![insights](file:///Users/senpai/Developer/thriceai/mics/img/insights.png)
+*Post-generation insights and analytics.*
 
 ## Notes
 

@@ -124,31 +124,31 @@ The application will start, and you see the output indicating the local URL (usu
 ## Screenshots
 
 ### Main Dashboard & Generation Workflow
-![Modes, feed and batch generation](file:///Users/senpai/Developer/thriceai/mics/img/Modes%2C%20feed%20and%20batch%20generation.png)
+![Modes, feed and batch generation](mics/img/Modes%2C%20feed%20and%20batch%20generation.png)
 *Initial view showing feed and batch generation modes.*
 
 ### Script Generation
-![Script generation input](file:///Users/senpai/Developer/thriceai/mics/img/Script%20generation%20input.png)
+![Script generation input](mics/img/Script%20generation%20input.png)
 *Input interface for script generation.*
 
-![Generate Script component](file:///Users/senpai/Developer/thriceai/mics/img/Generate%20Script%20component.png)
+![Generate Script component](mics/img/Generate%20Script%20component.png)
 *The system generating a script based on user input.*
 
 ### Video Generation & Monitoring
-![Batch generator](file:///Users/senpai/Developer/thriceai/mics/img/Batch%20generator.png)
+![Batch generator](mics/img/Batch%20generator.png)
 *Batch generation of reels.*
 
-![Terminal evnet streaming](file:///Users/senpai/Developer/thriceai/mics/img/Terminal%20evnet%20streaming.png)
+![Terminal evnet streaming](mics/img/Terminal%20evnet%20streaming.png)
 *Real-time updates during the generation process.*
 
-![Indivual video generation per script](file:///Users/senpai/Developer/thriceai/mics/img/Indivual%20video%20generation%20per%20script.png)
+![Indivual video generation per script](mics/img/Indivual%20video%20generation%20per%20script.png)
 *Monitoring individual video generation tasks.*
 
 ### Components & Insights
-![character and pip addition component](file:///Users/senpai/Developer/thriceai/mics/img/character%20and%20pip%20addition%20component.png)
+![character and pip addition component](mics/img/character%20and%20pip%20addition%20component.png)
 *Adding visual components like characters and PIP.*
 
-![insights](file:///Users/senpai/Developer/thriceai/mics/img/insights.png)
+![insights](mics/img/insights.png)
 *Post-generation insights and analytics.*
 
 ## Notes

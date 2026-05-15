@@ -62,7 +62,7 @@ const ReelGenerationSection = ({
           disabled={isReelGenerating || !audioMode}
           variant="default"
           size="sm"
-          className="gap-1.5 bg-success hover:bg-success/90 text-white shadow-sm"
+          className="gap-1.5 bg-success hover:bg-success/90 text-success-foreground shadow-sm"
         >
           {isReelGenerating && sessionCount === 0 && (
             <LoaderCircle className="w-3.5 h-3.5 animate-spin" />

@@ -31,16 +31,24 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ onSelectTopic, log }) 
     const [expandedDescriptions, setExpandedDescriptions] = useState<Record<string, boolean>>({});
     const [transcripts, setTranscripts] = useState<Record<string, string>>({});
     const [isFetchingTranscript, setIsFetchingTranscript] = useState<Record<string, boolean>>({});
+    
+    // Pagination state
+    const [visibleCount, setVisibleCount] = useState(12);
+    const observerRef = React.useRef<HTMLDivElement>(null);
 
-    const fetchVideos = useCallback(async () => {
+    const fetchVideos = useCallback(async (refresh = false) => {
         setIsLoading(true);
         try {
-            const data = await fetchData<{ videos: RSSVideo[] }>("/api/rss/videos");
+            const url = refresh ? "/api/rss/videos?refresh=true" : "/api/rss/videos";
+            const data = await fetchData<{ videos: RSSVideo[] }>(url);
             setVideos(data.videos);
 
             // Extract unique domains
             const uniqueDomains = Array.from(new Set(data.videos.map(v => v.domain)));
             setDomains(uniqueDomains);
+            
+            // Reset visible count on refresh
+            if (refresh) setVisibleCount(12);
         } catch (err: any) {
             log(`Failed to fetch RSS feed: ${err.message}`, "error");
         } finally {
@@ -90,6 +98,26 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ onSelectTopic, log }) 
         return matchesType && matchesDomain;
     });
 
+    const paginatedVideos = filteredVideos.slice(0, visibleCount);
+
+    // Infinite scroll observer
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && visibleCount < filteredVideos.length) {
+                    setVisibleCount(prev => prev + 12);
+                }
+            },
+            { threshold: 0.1 }
+        );
+
+        if (observerRef.current) {
+            observer.observe(observerRef.current);
+        }
+
+        return () => observer.disconnect();
+    }, [filteredVideos.length, visibleCount]);
+
     return (
         <div className="flex flex-col h-full gap-4">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -133,7 +161,7 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ onSelectTopic, log }) 
                 </div>
 
                 <button
-                    onClick={fetchVideos}
+                    onClick={() => fetchVideos(true)}
                     disabled={isLoading}
                     className="p-2 bg-secondary rounded-xl text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50"
                 >
@@ -143,17 +171,26 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ onSelectTopic, log }) 
 
             <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
                 {isLoading && videos.length === 0 ? (
-                    <div className="flex items-center justify-center h-40">
-                        <i className="fas fa-spinner fa-spin text-2xl text-primary/50"></i>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-pulse">
+                        {[...Array(8)].map((_, i) => (
+                            <div key={i} className="bg-card border border-border rounded-2xl overflow-hidden flex flex-col gap-3">
+                                <div className="aspect-video bg-muted" />
+                                <div className="p-3 space-y-2">
+                                    <div className="h-3 bg-muted rounded w-1/2" />
+                                    <div className="h-4 bg-muted rounded w-3/4" />
+                                    <div className="h-8 bg-muted rounded w-full mt-4" />
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 ) : filteredVideos.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-40 border-2 border-dashed border-border rounded-2xl text-muted-foreground">
+                    <div className="flex flex-col items-center justify-center h-40 border-2 border-dashed border-border rounded-2xl text-muted-foreground bg-muted/20">
                         <i className="fas fa-rss text-2xl mb-2 opacity-20"></i>
                         <p className="text-sm font-medium">No videos found</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {filteredVideos.map((video) => (
+                        {paginatedVideos.map((video) => (
                             <div key={video.video_id} className="group bg-card border border-border rounded-2xl overflow-hidden flex flex-col hover:border-primary/50 transition-colors shadow-sm">
                                 <div className="relative aspect-video overflow-hidden bg-muted">
                                     <img
@@ -162,18 +199,19 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ onSelectTopic, log }) 
                                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                                     />
                                     {video.is_short && (
-                                        <div className="absolute top-2 right-2 bg-red-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 shadow-lg">
+                                        <div className="absolute top-2 right-2 bg-primary text-primary-foreground text-[10px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 shadow-lg">
                                             <i className="fas fa-bolt"></i> SHORT
                                         </div>
                                     )}
-                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                    <div className="absolute inset-0 bg-background/60 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center gap-3 backdrop-blur-[2px]">
                                         <a
                                             href={video.link}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-white/40 transition-colors"
+                                            className="w-12 h-12 bg-primary/20 backdrop-blur-xl border border-primary/30 rounded-full flex items-center justify-center text-primary-foreground hover:bg-primary/40 hover:scale-110 transition-all shadow-xl"
+                                            title="Open on YouTube"
                                         >
-                                            <i className="fas fa-external-link-alt text-sm"></i>
+                                            <i className="fas fa-play text-sm ml-1"></i>
                                         </a>
                                     </div>
                                 </div>
@@ -206,32 +244,38 @@ export const FeedSection: React.FC<FeedSectionProps> = ({ onSelectTopic, log }) 
                                         )}
                                     </div>
 
-                                    {/* Transcript Button */}
-                                    <div className="flex gap-2 mt-2">
+                                    {/* Action Buttons */}
+                                    <div className="flex flex-wrap gap-2 mt-auto pt-2">
                                         <button
                                             onClick={() => fetchTranscript(video.video_id)}
                                             disabled={isFetchingTranscript[video.video_id]}
-                                            className={`flex-1 py-1.5 rounded-lg text-[9px] font-bold transition-all flex items-center justify-center gap-1.5 border ${transcripts[video.video_id] ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600' : 'bg-muted border-transparent text-muted-foreground hover:border-border'}`}
+                                            className={`flex-1 min-w-[90px] py-2 rounded-xl text-[9px] font-bold transition-all flex items-center justify-center gap-1.5 border ${transcripts[video.video_id] ? 'bg-primary/10 border-primary/20 text-primary' : 'bg-muted border-transparent text-muted-foreground hover:border-border'}`}
                                         >
                                             {isFetchingTranscript[video.video_id] ? (
                                                 <i className="fas fa-spinner fa-spin"></i>
                                             ) : transcripts[video.video_id] ? (
-                                                <><i className="fas fa-check"></i> TRANSCRIBED</>
+                                                <><i className="fas fa-check"></i> DONE</>
                                             ) : (
-                                                <><i className="fas fa-closed-captioning"></i> GET TRANSCRIPT</>
+                                                <><i className="fas fa-closed-captioning"></i> TRANSCRIPT</>
                                             )}
                                         </button>
 
                                         <button
                                             onClick={() => handleCreateReel(video)}
-                                            className="flex-[1.5] py-1.5 bg-primary text-primary-foreground text-[9px] font-black rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-primary/20 hover:scale-[1.02] active:scale-[0.98]"
+                                            className="flex-[1.5] min-w-[110px] py-2 bg-primary text-primary-foreground text-[9px] font-black rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-primary/20 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]"
                                         >
-                                            <i className="fas fa-play"></i> CREATE REEL
+                                            <i className="fas fa-magic"></i> CREATE REEL
                                         </button>
                                     </div>
                                 </div>
                             </div>
                         ))}
+                        {/* Sentinel for infinite scroll */}
+                        <div ref={observerRef} className="col-span-full h-10 flex items-center justify-center">
+                            {visibleCount < filteredVideos.length && (
+                                <i className="fas fa-spinner fa-spin text-muted-foreground opacity-20"></i>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>

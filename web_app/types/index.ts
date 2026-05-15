@@ -5,6 +5,8 @@ export interface CharacterDetails {
   voice_gemini?: string;
   voice_eleven?: string;
   voice_mac?: string;
+  voice_kokoro?: string;
+  voice_kokoro_mlx?: string;
 }
 
 export interface ConfigData {
@@ -12,7 +14,11 @@ export interface ConfigData {
   characters: Record<string, CharacterDetails>;
   audio_modes: Record<string, string>;
   prompts: Record<string, string>;
+  llm_providers: Record<string, string>;
+  current_llm_provider: string;
   max_query_length: number;
+  kokoro_voices: Record<string, string[]>;
+  languages: { code: string; name: string }[];
 }
 
 export interface ReelItem {

@@ -31,6 +31,11 @@ from moviepy.editor import (
 )
 
 try:
+    from .pyav_renderer import PyAVRenderer
+except ImportError:
+    from pyav_renderer import PyAVRenderer
+
+try:
     from ..config import (
         AVATAR_DIR,
         AVATAR_WIDTH,
@@ -40,12 +45,12 @@ try:
         CHARACTER_MAP,
         FONT,
         FONT_SIZE,
+        IS_MAC,
         MIN_CLIP_DURATION,
         OUTPUT_DIR,
         # --- NEW IMPORTS ---
         PIP_DIR,
-        PIP_WIDTH,
-        PIP_Y_OFFSET,
+        PIP_MARGIN,
         STROKE_COLOR,
         STROKE_WIDTH,
         TARGET_H,
@@ -74,12 +79,12 @@ except ImportError:
         CHARACTER_MAP,
         FONT,
         FONT_SIZE,
+        IS_MAC,
         MIN_CLIP_DURATION,
         OUTPUT_DIR,
         # --- NEW IMPORTS ---
         PIP_DIR,
-        PIP_WIDTH,
-        PIP_Y_OFFSET,
+        PIP_MARGIN,
         STROKE_COLOR,
         STROKE_WIDTH,
         TARGET_H,
@@ -102,6 +107,7 @@ except ImportError:
 
 # --- Font Cache ---
 _FONT_CACHE = {}
+
 
 def _get_font(size):
     """Returns a cached ImageFont to avoid reloading from disk per word."""
@@ -324,11 +330,16 @@ class ReelGenerator:
                     img = img.convert("RGBA")
                 pip_clip = ImageClip(np.array(img), duration=duration)
 
-            pip_clip = pip_clip.fx(vfx.resize, width=PIP_WIDTH)
+            # New Scaling Logic for MoviePy
+            orig_w, orig_h = pip_clip.size
+            max_w = TARGET_W - 2 * PIP_MARGIN
+            max_h = (TARGET_H / 2) - 2 * PIP_MARGIN
 
-            x_pos = (TARGET_W - pip_clip.w) / 2
-            y_pos = (TARGET_H / 2) - pip_clip.h - PIP_Y_OFFSET
-            y_pos = max(50, y_pos)
+            scale = min(max_w / orig_w, max_h / orig_h)
+            pip_clip = pip_clip.fx(vfx.resize, scale)
+
+            x_pos = (TARGET_W - pip_clip.w) // 2
+            y_pos = (TARGET_H / 2) - pip_clip.h - PIP_MARGIN
 
             return pip_clip.set_start(start_time).set_pos((x_pos, y_pos))
 
@@ -489,6 +500,103 @@ class ReelGenerator:
 
         return avatar_clips
 
+    def _get_avatar_metadata(self, word_data_list):
+        """Extract metadata for PyAVRenderer to avoid MoviePy overhead."""
+        metadata = []
+        offset = VIDEO_PADDING_START
+
+        X_PADDING = 100
+        LEFT_POS_X = X_PADDING
+        RIGHT_POS_X = TARGET_W - AVATAR_WIDTH - X_PADDING
+        LEFT_LAYOUT = {"pos_x": LEFT_POS_X, "flip": False}
+        RIGHT_LAYOUT = {"pos_x": RIGHT_POS_X, "flip": True}
+
+        role_to_layout_map = {}
+        for word_data in word_data_list:
+            role = word_data["role"]
+            if role not in role_to_layout_map:
+                if len(role_to_layout_map) == 0:
+                    role_to_layout_map[role] = LEFT_LAYOUT
+                elif len(role_to_layout_map) == 1:
+                    role_to_layout_map[role] = RIGHT_LAYOUT
+                else:
+                    break
+
+        speaker_segments = self._get_speaker_segments(word_data_list)
+
+        # Parallel pre-processing
+        processing_jobs = {}
+        for segment in speaker_segments:
+            role = segment["role"]
+            char_cfg = CHARACTER_MAP.get(role)
+            layout = role_to_layout_map.get(role)
+            if not char_cfg or not layout or not char_cfg.get("avatar"):
+                continue
+
+            src_path = os.path.join(AVATAR_DIR, char_cfg["avatar"])
+            if not os.path.exists(src_path):
+                continue
+            processing_jobs[(src_path, layout["flip"])] = role
+
+        processed_paths = {}
+        with ThreadPoolExecutor() as executor:
+            futures = [
+                executor.submit(self._preprocess_avatar_image, src, flip, role)
+                for (src, flip), role in processing_jobs.items()
+            ]
+            for f in as_completed(futures):
+                key, path = f.result()
+                processed_paths[key] = path
+
+        for segment in speaker_segments:
+            role = segment["role"]
+            char_cfg = CHARACTER_MAP.get(role)
+            layout = role_to_layout_map.get(role)
+            if not char_cfg or not layout or not char_cfg.get("avatar"):
+                continue
+
+            src_path = os.path.join(AVATAR_DIR, char_cfg["avatar"])
+            final_path = processed_paths.get((src_path, layout["flip"]), src_path)
+
+            metadata.append(
+                {
+                    "path": final_path,
+                    "start": segment["start"],
+                    "end": segment["end"],
+                    "pos_x": layout["pos_x"],
+                }
+            )
+        return metadata
+
+    def _get_pip_metadata(self, start_time, end_time):
+        """Extract metadata for PIP asset for PyAVRenderer."""
+        if start_time >= end_time:
+            return None
+
+        # Determine asset path
+        if self.pip_asset_override:
+            if os.path.isabs(self.pip_asset_override):
+                asset_path = self.pip_asset_override
+            else:
+                asset_path = os.path.join(PIP_DIR, self.pip_asset_override)
+        else:
+            assets = glob.glob(os.path.join(PIP_DIR, "*"))
+            if not assets:
+                return None
+            asset_path = assets[0]
+
+        if not os.path.exists(asset_path):
+            return None
+
+        # For now, we only support static images or the first frame of video for PyAV PIP
+        # to keep it fast and simple. Full video PIP requires another decoder loop.
+
+        return {
+            "path": asset_path,
+            "start": start_time,
+            "end": end_time,
+        }
+
     def _apply_avatar_speaking_animation(self, clip, segment_duration):
         """Creates a continuous, subtle, repeating bounce/scale effect for an avatar."""
 
@@ -509,7 +617,9 @@ class ReelGenerator:
         # Calculate the total duration needed including padding
         total_duration = required_duration + VIDEO_PADDING_START + VIDEO_PADDING_END
 
-        print(f"  Using background video: {os.path.basename(self.video_file)}")
+        # print(f"  Using background video: {os.path.basename(self.video_file)}")
+
+        self.bg_start_time = 0.0
 
         with suppress_output():
             video = VideoFileClip(self.video_file)
@@ -521,6 +631,7 @@ class ReelGenerator:
                 # Otherwise, take a random subclip
                 max_start_time = video.duration - total_duration
                 start_time = random.uniform(0, max(0, max_start_time))
+                self.bg_start_time = start_time
                 final_video_clip = video.subclip(
                     start_time, start_time + total_duration
                 )
@@ -573,13 +684,24 @@ class ReelGenerator:
 
             # 4-6. Prepare Background Video, Text Clips, and Avatar Clips IN PARALLEL
             #       These stages are independent and can run concurrently.
+            #       Skip word-by-word captions for non-English languages (timing is unreliable).
+            skip_captions = language_code != "en"
+            print(f"PROGRESS:10:{self.final_reel_name}")
             with ThreadPoolExecutor(max_workers=3) as executor:
-                video_future = executor.submit(self._prepare_video, required_caption_duration)
-                text_future = executor.submit(self._create_text_clips, word_data_list)
-                avatar_future = executor.submit(self._create_avatar_clips, word_data_list)
+                video_future = executor.submit(
+                    self._prepare_video, required_caption_duration
+                )
+                text_future = (
+                    executor.submit(self._create_text_clips, word_data_list)
+                    if not skip_captions
+                    else None
+                )
+                avatar_future = executor.submit(
+                    self._create_avatar_clips, word_data_list
+                )
 
                 final_video_clip = video_future.result()
-                text_clips = text_future.result()
+                text_clips = text_future.result() if text_future else []
                 avatar_clips = avatar_future.result()
 
             # 7.5 Create PIP Asset Clip (Optional)
@@ -625,37 +747,69 @@ class ReelGenerator:
                 print("Video generation failed: No text or avatar clips were created.")
                 return
 
-            # 9. Compose Final Clip
-            final_clip = CompositeVideoClip(
-                [final_video_clip]
-                + text_clips
-                + avatar_clips
-                + pip_clips,  # ADDED follow_animation_clips & pip_clips
-                size=(TARGET_W, TARGET_H),
-            )
-            final_clip = final_clip.set_audio(final_audio_clip)
+            # 9. Compose and Render
+            if IS_MAC:
+                # Use Hardware-Accelerated PyAV Renderer
+                print(f"PROGRESS:30:{self.final_reel_name}")
+                print("  > Switching to PyAV Hardware-Accelerated Renderer...")
 
-            with suppress_output():
-                # Build ffmpeg params for browser compatibility
-                ffmpeg_params = ["-pix_fmt", "yuv420p", "-movflags", "+faststart"]
-
-                # Preset only applies to libx264, not hardware encoders
-                write_kwargs = dict(
-                    fps=24,
-                    codec=VIDEO_CODEC,
-                    audio_codec="aac",
-                    temp_audiofile=os.path.join(
-                        TEMP_DIR, f"temp-audio-{uuid.uuid4()}.m4a"
-                    ),
-                    remove_temp=True,
-                    threads=6,
-                    logger=None,
-                    ffmpeg_params=ffmpeg_params,
+                # Get temporary audio file path for merging
+                temp_audio_merge = os.path.join(
+                    TEMP_DIR, f"temp_audio_{uuid.uuid4()}.m4a"
                 )
-                if VIDEO_CODEC == "libx264":
-                    write_kwargs["preset"] = "ultrafast"
+                final_audio_clip.write_audiofile(
+                    temp_audio_merge, codec="aac", logger=None
+                )
 
-                final_clip.write_videofile(self.temp_output_file, **write_kwargs)
+                # Extract Avatar Metadata
+                avatar_metadata = self._get_avatar_metadata(word_data_list)
+
+                # Extract PIP Metadata (if any)
+                pip_metadata = self._get_pip_metadata(
+                    VIDEO_PADDING_START, final_video_clip.duration
+                )
+
+                renderer = PyAVRenderer(fps=24)
+                renderer.render(
+                    output_path=self.temp_output_file,
+                    bg_video_path=self.video_file,
+                    audio_path=temp_audio_merge,
+                    word_data=word_data_list,
+                    avatar_clips_data=avatar_metadata,
+                    pip_clip_data=pip_metadata,
+                    bg_start_time=getattr(self, "bg_start_time", 0.0),
+                    skip_captions=skip_captions,
+                )
+
+                # Cleanup temp audio
+                if os.path.exists(temp_audio_merge):
+                    os.remove(temp_audio_merge)
+            else:
+                # Fallback to MoviePy for Linux/Windows
+                final_clip = CompositeVideoClip(
+                    [final_video_clip] + text_clips + avatar_clips + pip_clips,
+                    size=(TARGET_W, TARGET_H),
+                )
+                final_clip = final_clip.set_audio(final_audio_clip)
+
+                with suppress_output():
+                    ffmpeg_params = ["-pix_fmt", "yuv420p", "-movflags", "+faststart"]
+                    write_kwargs = dict(
+                        fps=24,
+                        codec=VIDEO_CODEC,
+                        audio_codec="aac",
+                        temp_audiofile=os.path.join(
+                            TEMP_DIR, f"temp-audio-{uuid.uuid4()}.m4a"
+                        ),
+                        remove_temp=True,
+                        threads=6,
+                        logger=None,
+                        ffmpeg_params=ffmpeg_params,
+                    )
+                    if VIDEO_CODEC == "libx264":
+                        write_kwargs["preset"] = "ultrafast"
+
+                    final_clip.write_videofile(self.temp_output_file, **write_kwargs)
 
             # 10. Move to Final Location
             shutil.move(self.temp_output_file, self.final_output_path)
@@ -666,6 +820,7 @@ class ReelGenerator:
 
         except FileNotFoundError as e:
             print(f"\n❌ An error occurred: {e}")
+            raise
         except Exception as e:
             import traceback
 
@@ -673,6 +828,7 @@ class ReelGenerator:
                 f"\n❌ An error occurred during video generation for {self.input_json_path}: {e}"
             )
             traceback.print_exc()
+            raise
 
         finally:
             # Ensure temporary frames from WebP processing are also cleaned up if needed

@@ -15,6 +15,12 @@ except ImportError:
     sf = None
 
 try:
+    from misaki import en, espeak
+except ImportError:
+    en = None
+    espeak = None
+
+try:
     from ..config import KOKORO_MODEL_PATH, KOKORO_VOICES_PATH
 except ImportError:
     try:
@@ -24,6 +30,21 @@ except ImportError:
         KOKORO_VOICES_PATH = "data/models/kokoro/voices-v1.0.bin"
 
 _KOKORO_INSTANCE = None
+_G2P_INSTANCE = None
+
+def _get_g2p():
+    """Returns a lazily initialized Misaki G2P instance."""
+    global _G2P_INSTANCE
+    if _G2P_INSTANCE is None:
+        if en is None:
+            return None
+        try:
+            fallback = espeak.EspeakFallback(british=False)
+            _G2P_INSTANCE = en.G2P(trf=False, british=False, fallback=fallback)
+        except Exception as e:
+            print(f"  > Kokoro TTS: Misaki G2P initialization failed: {e}. Falling back to default phonemizer.")
+            return None
+    return _G2P_INSTANCE
 
 def _get_kokoro():
     """Returns a lazily initialized Kokoro instance."""
@@ -37,8 +58,23 @@ def _get_kokoro():
         if not os.path.exists(KOKORO_VOICES_PATH):
             raise FileNotFoundError(f"Kokoro voices not found at {KOKORO_VOICES_PATH}")
             
-        print(f"  > Kokoro TTS: Loading model from {KOKORO_MODEL_PATH}...")
-        _KOKORO_INSTANCE = Kokoro(KOKORO_MODEL_PATH, KOKORO_VOICES_PATH)
+        # print(f"  > Kokoro TTS: Loading model from {KOKORO_MODEL_PATH}...")
+        provider = os.getenv("ONNX_PROVIDER", "CoreMLExecutionProvider")
+        # print(f"  > Kokoro TTS: Using ONNX Provider: {provider}")
+        
+        import onnxruntime as rt
+        # Force ALL compute units (NPU + GPU + CPU fallback) for max speed on M4
+        providers = [
+            (provider, {
+                'MLComputeUnits': 'ALL',
+            }),
+            'CPUExecutionProvider'
+        ]
+        
+        _KOKORO_INSTANCE = Kokoro.from_session(
+            rt.InferenceSession(KOKORO_MODEL_PATH, providers=providers),
+            KOKORO_VOICES_PATH
+        )
     return _KOKORO_INSTANCE
 
 def is_service_available():
@@ -50,6 +86,7 @@ def is_service_available():
 def generate_audio(text, voice_id, output_path, turn_index):
     """
     Generates audio using Kokoro-ONNX and saves it to a WAV file.
+    Uses Misaki G2P if available for better quality.
     """
     if not is_service_available():
         if Kokoro is None or sf is None:
@@ -58,15 +95,26 @@ def generate_audio(text, voice_id, output_path, turn_index):
 
     try:
         kokoro = _get_kokoro()
+        g2p = _get_g2p()
         
-        # Kokoro expects voice_id (e.g., 'af_sarah')
-        # We can also pass speed=1.0 by default or allow customization later
-        samples, sample_rate = kokoro.create(
-            text, 
-            voice=voice_id, 
-            speed=1.0, 
-            lang="en-us"
-        )
+        if g2p:
+            # Use Misaki G2P
+            phonemes, _ = g2p(text)
+            samples, sample_rate = kokoro.create(
+                phonemes, 
+                voice=voice_id, 
+                speed=1.0, 
+                lang="en-us",
+                is_phonemes=True
+            )
+        else:
+            # Fallback to default phonemizer
+            samples, sample_rate = kokoro.create(
+                text, 
+                voice=voice_id, 
+                speed=1.0, 
+                lang="en-us"
+            )
 
         # Save to WAV file
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -80,3 +128,4 @@ def generate_audio(text, voice_id, output_path, turn_index):
     except Exception as e:
         print(f"Kokoro TTS Error for turn {turn_index}: {e}", file=sys.stderr)
         raise
+

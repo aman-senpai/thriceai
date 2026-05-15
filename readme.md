@@ -114,7 +114,7 @@ The bot provides a secure, remote interface for the generation pipeline:
 2. Message your bot on Telegram:
    - `/help`: List all commands.
    - `/script <topic> <filename>`: Generate a script.
-   - `/generate <filename> [audio_mode]`: Generate a reel from a script. Supported audio modes: `gemini`, `elevenlabs`, `mac_say`.
+   - `/generate <filename> [audio_mode]`: Generate a reel from a script. Supported audio modes: `kokoro_mlx`, `kokoro`, `mac_say`, `elevenlabs`, `gemini`.
    - `/reel <topic>`: **Full Auto Mode** (Script -> Reel -> Caption -> Telegram Upload).
    - `/status`: Check generation progress.
 

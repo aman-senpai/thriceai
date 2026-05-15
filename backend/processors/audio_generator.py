@@ -8,8 +8,8 @@ import shutil
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from moviepy.editor import AudioFileClip, concatenate_audioclips
 import whisper_timestamped as whisper
+from moviepy.editor import AudioFileClip, concatenate_audioclips
 
 # Import necessary components from config
 # Import necessary components from config
@@ -87,10 +87,10 @@ try:
 
             GEMINI_RATE_LIMIT_ERROR_CODE = "429 RESOURCE_EXHAUSTED"
         except ImportError as e2:
-            print(f"DEBUG: Failed to import gemini_tts: {e1} | {e2}")
+            # print(f"DEBUG: Failed to import gemini_tts: {e1} | {e2}")
             gemini_tts = GeminiServiceStub()
 except Exception as e:
-    print(f"DEBUG: Unexpected error importing gemini_tts: {e}")
+    # print(f"DEBUG: Unexpected error importing gemini_tts: {e}")
     if "gemini_tts" not in locals():
         gemini_tts = GeminiServiceStub()
 
@@ -132,14 +132,85 @@ except ImportError:
     kokoro_tts = KokoroServiceStub()
 
 
+try:
+    try:
+        from ..services import kokoro_mlx_tts
+    except ImportError:
+        import services.kokoro_mlx_tts as kokoro_mlx_tts
+except ImportError:
+
+    class KokoroMLXServiceStub:
+        def is_service_available(self):
+            return False
+
+        def generate_audio_mlx(self, *args, **kwargs):
+            raise NotImplementedError("Kokoro MLX service not implemented.")
+
+    kokoro_mlx_tts = KokoroMLXServiceStub()
+
+
 # --- VOICE ID LOOKUP UTILITY ---
-def get_voice_id_for_role(role, tts_mode):
+# Language voice pools for auto-mapping (kokoro_mlx voices only)
+# Keyed by ISO 639-1 language code
+_LANG_VOICE_POOLS = {
+    "hi": {"female": ["hf_alpha", "hf_beta"], "male": ["hm_omega", "hm_psi"]},
+    "ja": {"female": ["jf_alpha", "jf_gongitsune"], "male": ["jm_kumo"]},
+    "zh": {"female": ["zf_xiaobei", "zf_xiaoni"], "male": ["zm_yunjian", "zm_yunxi"]},
+    "es": {"female": ["ef_dora"], "male": ["em_alex", "em_santa"]},
+    "fr": {"female": ["ff_siwis"], "male": []},
+    "it": {"female": ["if_sara"], "male": ["im_nicola"]},
+    "pt": {"female": ["pf_dora"], "male": ["pm_alex", "pm_santa"]},
+}
+
+
+def _infer_gender(voice_id: str) -> str | None:
+    """Infer voice gender from Kokoro prefix (second char: f=female, m=male)."""
+    if len(voice_id) >= 2:
+        gender_char = voice_id[1]
+        if gender_char == "f":
+            return "female"
+        if gender_char == "m":
+            return "male"
+    return None
+
+
+def _auto_map_voice(original_voice: str, language_code: str) -> str | None:
+    """Map an English voice to a language-appropriate voice, preserving gender."""
+    pool = _LANG_VOICE_POOLS.get(language_code)
+    if not pool:
+        return None
+    gender = _infer_gender(original_voice)
+    if not gender:
+        return None
+    candidates = pool.get(gender, [])
+    if candidates:
+        return candidates[0]
+    # Fallback to any voice in the pool
+    for g in ("female", "male"):
+        if pool.get(g):
+            return pool[g][0]
+    return None
+
+
+def get_voice_id_for_role(role, tts_mode, language_code=None):
     """
     Retrieves the specific voice ID for a character and TTS mode from CHARACTER_MAP.
+    Falls back to case-insensitive matching if exact match fails.
+    If language_code is set, auto-selects a language-appropriate voice.
     """
-    config = CHARACTER_MAP.get(role, {})
+    config = CHARACTER_MAP.get(role)
+    if config is None:
+        # Case-insensitive fallback
+        for key, val in CHARACTER_MAP.items():
+            if key.lower() == role.lower():
+                config = val
+                break
+    if config is None:
+        config = {}
+        print(
+            f"  ⚠ Character '{role}' not found in config. Available: {list(CHARACTER_MAP.keys())}"
+        )
 
-    # Map 'default' to 'gemini' for backward compatibility or simple selection
     effective_mode = "gemini" if tts_mode == "default" else tts_mode
 
     if effective_mode == "gemini":
@@ -150,6 +221,15 @@ def get_voice_id_for_role(role, tts_mode):
         voice_key = "voice_mac"
     elif effective_mode == "kokoro":
         voice_key = "voice_kokoro"
+    elif effective_mode == "kokoro_mlx":
+        voice_key = "voice_kokoro_mlx"
+        voice_id = config.get(voice_key) or config.get("voice_kokoro")
+        # For non-English languages, auto-map to a language-appropriate voice
+        if voice_id and language_code and language_code != "en":
+            mapped = _auto_map_voice(voice_id, language_code)
+            if mapped:
+                return mapped
+        return voice_id
     else:
         return None
 
@@ -162,7 +242,7 @@ def get_voice_id_for_role(role, tts_mode):
 # --- AUDIO GENERATION CORE LOGIC ---
 
 
-def _generate_tts_only(turn_index, turn, tts_mode, reel_name=None):
+def _generate_tts_only(turn_index, turn, tts_mode, language_code="en", reel_name=None):
     """
     Generates audio file for a single turn and returns the path.
     """
@@ -176,25 +256,36 @@ def _generate_tts_only(turn_index, turn, tts_mode, reel_name=None):
         # Mapping common emotion tags to punctuation-based cues
         text = re.sub(r"\[disbelief\]", "...?", text, flags=re.IGNORECASE)
         text = re.sub(r"\[(?:confused|questioning)\]", "?", text, flags=re.IGNORECASE)
-        text = re.sub(r"\[(?:pause|thoughtful|hesitation)\]", "...", text, flags=re.IGNORECASE)
-        text = re.sub(r"\[(?:excited|surprised|shouting|happy)\]", "!!", text, flags=re.IGNORECASE)
-        text = re.sub(r"\[(?:interrupted|cutting off)\]", "—", text, flags=re.IGNORECASE)
+        text = re.sub(
+            r"\[(?:pause|thoughtful|hesitation)\]", "...", text, flags=re.IGNORECASE
+        )
+        text = re.sub(
+            r"\[(?:excited|surprised|shouting|happy)\]", "!!", text, flags=re.IGNORECASE
+        )
+        text = re.sub(
+            r"\[(?:interrupted|cutting off)\]", "—", text, flags=re.IGNORECASE
+        )
         text = re.sub(r"\[(?:serious|stern|angry)\]", ".", text, flags=re.IGNORECASE)
         # Strip any remaining unknown [emotion] tags
         text = re.sub(r"\[.*?\]", "", text).strip()
 
-        # Normalize numbers for Kokoro: remove commas and use "point" for decimals/fractions
-        # 1. Remove commas between digits (e.g., 100,000 -> 100000)
-        text = re.sub(r"(?<=\d),(?=\d)", "", text)
-        # 2. Replace dots between digits with " point " (e.g., 4.6 -> 4 point 6, 2.9.1 -> 2 point 9 point 1)
-        text = re.sub(r"(?<=\d)\.(?=\d)", " point ", text)
-    
+        # Normalize numbers for Kokoro: ASCII digits only, skip non-Latin scripts
+        text = re.sub(r"(?<=[0-9]),(?=[0-9])", "", text)
+        text = re.sub(r"(?<=[0-9])\.(?=[0-9])", " point ", text)
+
+    # Apply same normalization for kokoro_mlx
+    if effective_mode == "kokoro_mlx":
+        text = re.sub(r"\[.*?\]", "", text).strip()
+        # Only normalize ASCII digits — don't touch non-English scripts (Devanagari, etc.)
+        text = re.sub(r"(?<=[0-9]),(?=[0-9])", "", text)
+        text = re.sub(r"(?<=[0-9])\.(?=[0-9])", " point ", text)
+
     # Strip [emotion] tags for mac_say since it doesn't support them
     # and would speak them literally (e.g. "open bracket disbelief close bracket")
     if effective_mode == "mac_say":
         text = re.sub(r"\[.*?\]", "", text).strip()
 
-    voice_id = get_voice_id_for_role(role, tts_mode)
+    voice_id = get_voice_id_for_role(role, tts_mode, language_code=language_code)
 
     if not voice_id:
         print(
@@ -221,6 +312,10 @@ def _generate_tts_only(turn_index, turn, tts_mode, reel_name=None):
         service = kokoro_tts
         temp_audio_path = TEMP_WAV_PATH.format(turn_index)
         ext = ".wav"
+    elif effective_mode == "kokoro_mlx":
+        service = kokoro_mlx_tts
+        temp_audio_path = TEMP_WAV_PATH.format(turn_index)
+        ext = ".wav"
     else:
         return None
 
@@ -237,9 +332,9 @@ def _generate_tts_only(turn_index, turn, tts_mode, reel_name=None):
             )
 
             if os.path.exists(cache_path):
-                print(
-                    f"  > Using cached Gemini audio for turn {turn_index} ({reel_name})"
-                )
+                # print(
+                #     f"  > Using cached Gemini audio for turn {turn_index} ({reel_name})"
+                # )
                 shutil.copy2(cache_path, temp_audio_path)
                 return {
                     "index": turn_index,
@@ -250,9 +345,9 @@ def _generate_tts_only(turn_index, turn, tts_mode, reel_name=None):
         except Exception as e:
             print(f"Warning: Cache check failed: {e}")
 
-    print(
-        f"  > {effective_mode.upper()} TTS: Generating audio for turn {turn_index} with voice '{voice_id}'."
-    )
+    # print(
+    #     f"  > {effective_mode.upper()} TTS: Generating audio for turn {turn_index} with voice '{voice_id}'."
+    # )
 
     if not service.is_service_available():
         print(
@@ -264,7 +359,20 @@ def _generate_tts_only(turn_index, turn, tts_mode, reel_name=None):
     for attempt in range(MAX_GEMINI_RETRIES):
         try:
             # --- FIX: Added turn_index as a positional argument to generate_audio for all services. ---
-            if service.generate_audio(text, voice_id, temp_audio_path, turn_index):
+            success = False
+            if effective_mode == "kokoro_mlx":
+                if service.generate_audio_mlx(
+                    text,
+                    voice_id,
+                    temp_audio_path,
+                    turn_index,
+                    language_code=language_code,
+                ):
+                    success = True
+            elif service.generate_audio(text, voice_id, temp_audio_path, turn_index):
+                success = True
+
+            if success:
                 # Save to cache if enabled
                 if cache_path:
                     try:
@@ -325,7 +433,7 @@ def generate_multi_role_audio_multiprocess(
     1. Parallel TTS Generation (IO Bound) using ThreadPoolExecutor.
     2. Script-based word timing (uses original text with proportional distribution).
     """
-    print(f"\nSelected TTS Mode: {tts_mode.upper()}")
+    # print(f"\nSelected TTS Mode: {tts_mode.upper()}")
 
     # --- PHASE 1: PARALLEL AUDIO GENERATION ---
     start_time = time.time()
@@ -339,14 +447,19 @@ def generate_multi_role_audio_multiprocess(
     if num_threads < 1:
         num_threads = 1
 
-    print(f"  > Spawning {num_threads} threads for TTS generation...")
+    # print(f"  > Spawning {num_threads} threads for TTS generation...")
 
     tts_results = []
 
     with ThreadPoolExecutor(max_workers=num_threads) as executor:
         future_to_turn = {
             executor.submit(
-                _generate_tts_only, i, turn, tts_mode, reel_name=reel_name
+                _generate_tts_only,
+                i,
+                turn,
+                tts_mode,
+                language_code=language_code,
+                reel_name=reel_name,
             ): i
             for i, turn in enumerate(ordered_turns)
         }
@@ -365,10 +478,10 @@ def generate_multi_role_audio_multiprocess(
     if not tts_results:
         raise Exception("Failed to generate any audio files.")
 
-    print(f"  > TTS Phase completed in {time.time() - start_time:.2f}s")
+    # print(f"  > TTS Phase completed in {time.time() - start_time:.2f}s")
 
     # --- PHASE 2: WHISPER TRANSCRIPTION FOR WORD TIMESTAMPS ---
-    print(f"  > Loading Whisper model ({WHISPER_DEVICE}) once for all turns...")
+    # print(f"  > Loading Whisper model ({WHISPER_DEVICE}) once for all turns...")
 
     # Load model ONCE for all turns
     try:
@@ -382,7 +495,7 @@ def generate_multi_role_audio_multiprocess(
     audio_clips = []
     current_offset = 0.0
 
-    print("  > Starting Whisper transcription...")
+    # print("  > Starting Whisper transcription...")
 
     for item in tts_results:
         turn_index = item["index"]
@@ -392,19 +505,56 @@ def generate_multi_role_audio_multiprocess(
         try:
             # 1. Transcribe with Whisper to get word-level timestamps
             with suppress_output():
+                # Use language_code for Whisper (ISO 639-1), fallback to "en"
+                whisper_lang = language_code if language_code else "en"
                 result = whisper.transcribe(
-                    whisper_model, audio_path, language="en", verbose=False
+                    whisper_model, audio_path, language=whisper_lang, verbose=False
                 )
 
-            # 2. Extract word data from Whisper result
+            # 2. Get original text (emotion tags already stripped by TTS)
+            original_text = item.get("text", "")
+            original_words = _tokenize_text(original_text) if original_text else []
+
+            # 3. Extract word data from Whisper result (timing only)
+            #    Replace transcribed word text with original script words for accuracy
             turn_word_data = []
+            whisper_words = []
             for segment in result["segments"]:
                 for word in segment["words"]:
+                    whisper_words.append(word)
+
+            # Use original words if counts match, otherwise use a proportional mapping
+            if len(original_words) == len(whisper_words):
+                for i, w in enumerate(whisper_words):
                     turn_word_data.append(
                         {
-                            "word": word["text"],
-                            "start": word["start"],
-                            "end": word["end"],
+                            "word": original_words[i],
+                            "start": w["start"],
+                            "end": w["end"],
+                            "role": role,
+                        }
+                    )
+            elif len(original_words) > 0:
+                # Proportional mapping: distribute Whisper timestamps across original words
+                total_duration = whisper_words[-1]["end"] if whisper_words else 0
+                per_word = total_duration / len(original_words) if original_words else 0
+                for i, word_text in enumerate(original_words):
+                    turn_word_data.append(
+                        {
+                            "word": word_text,
+                            "start": i * per_word,
+                            "end": (i + 1) * per_word,
+                            "role": role,
+                        }
+                    )
+            else:
+                # Fallback: use Whisper output directly
+                for w in whisper_words:
+                    turn_word_data.append(
+                        {
+                            "word": w["text"],
+                            "start": w["start"],
+                            "end": w["end"],
                             "role": role,
                         }
                     )
@@ -433,9 +583,7 @@ def generate_multi_role_audio_multiprocess(
     # Normalize timestamps to match actual audio duration (eliminates drift)
     if all_word_data:
         true_duration = final_audio_clip.duration
-        whisper_total_time = (
-            all_word_data[-1]["end"] if all_word_data else 0.0
-        )
+        whisper_total_time = all_word_data[-1]["end"] if all_word_data else 0.0
 
         if whisper_total_time > 0 and abs(true_duration - whisper_total_time) > 0.1:
             scale_factor = true_duration / whisper_total_time
@@ -453,13 +601,13 @@ def filter_word_data(word_data_list):
     """Filters out words that are too short to display."""
     filtered = []
 
-    # Require at least one alphanumeric character
-    word_pattern = re.compile(r"[a-zA-Z0-9]")
+    # Require at least one word character (Unicode-aware — supports Devanagari, CJK, etc.)
+    word_pattern = re.compile(r"\w", re.UNICODE)
 
     for word in word_data_list:
-        if (word["end"] - word["start"] >= MIN_CLIP_DURATION) and word_pattern.search(
-            word["word"]
-        ):
+        duration = word["end"] - word["start"]
+        has_word_char = word_pattern.search(word["word"])
+        if duration >= MIN_CLIP_DURATION and has_word_char:
             filtered.append(word)
 
     return filtered
@@ -475,7 +623,10 @@ def load_input_json(file_path):
             data = json.load(f)
 
         ordered_turns = data["conversation"]
-        language_code = data.get("metadata", {}).get("language", "en")
+        # Support both top-level languageCode and nested metadata.language
+        language_code = data.get("languageCode") or data.get("metadata", {}).get(
+            "language", "en"
+        )
 
         if not isinstance(ordered_turns, list) or not ordered_turns:
             raise ValueError(

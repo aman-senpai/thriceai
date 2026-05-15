@@ -3,6 +3,7 @@
 import contextlib
 import io
 import json
+import logging
 import os
 import sys
 
@@ -10,6 +11,21 @@ from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
+
+
+# --- SUPPRESS VERBOSE LIBRARY WARNINGS ---
+# EspeakG2P chunking warning uses root logger, add a message filter
+class _SuppressEspeakFilter(logging.Filter):
+    def filter(self, record):
+        msg = record.getMessage()
+        if "EspeakG2P" in msg or "Chunking logic not yet implemented" in msg:
+            return False
+        return True
+
+
+logging.root.addFilter(_SuppressEspeakFilter())
+# HuggingFace Hub unauthenticated warning (model already local)
+logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
 
 # --- DIRECTORY CONFIGURATION ---
 # Determine project root (assuming this file is in backend/config.py)
@@ -19,13 +35,24 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 
 # --- PIP ASSET CONFIGURATION ---
 PIP_DIR = os.path.join(DATA_DIR, "assets", "pip")
-PIP_WIDTH = 900  # Width of the PIP asset
-PIP_Y_OFFSET = 100  # Distance above the captions (if centered) or from top
+PIP_MARGIN = 100  # Margin from top, sides, and captions
 # -------------------------------
 
 # --- API KEY NAME ---
 ELEVEN_API_KEY_NAME = "ELEVEN_API"
 GEMINI_API_KEY_NAME = "GEMINI_API_KEY"
+DEEPSEEK_API_KEY_NAME = "DEEPSEEK_API_KEY"
+OPENAI_API_KEY_NAME = "OPENAI_API_KEY"
+
+# --- LLM PROVIDER CONFIGURATION ---
+# "gemini" (default) or "deepseek" for content generation
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini").lower()
+LLM_PROVIDERS = {
+    "gemini": "Gemini (Google)",
+    "deepseek": "DeepSeek",
+}
+DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro")
 
 # --- TTS SERVICE RATE LIMIT CONFIGURATION ---
 GEMINI_TTS_WAIT_SECONDS = 6.0
@@ -34,11 +61,14 @@ GEMINI_TTS_WAIT_SECONDS = 6.0
 # Default to 1 for services without a specific config
 DEFAULT_TTS_PROCESSES = 1
 TTS_PROCESS_CONFIG = {
-    "gemini": 3,  # Increased to 3 for parallel generation
-    "elevenlabs": 2,  # Configured to 2
-    "mac_say": 10,  # Configured to 10
+    "kokoro_mlx": 4,  # MLX is very fast on Apple Silicon
     "kokoro": 2,  # Added support for Kokoro
+    "mac_say": 10,  # Configured to 10
+    "elevenlabs": 2,  # Configured to 2
+    "gemini": 3,  # Increased to 3 for parallel generation
 }
+
+AUDIO_MODE_ORDER = ["kokoro_mlx", "kokoro", "mac_say", "elevenlabs", "gemini"]
 
 
 # --- DIRECTORY CONFIGURATION ---
@@ -66,6 +96,8 @@ CAPTION_SYSTEM_PROMPT_PATH = os.path.join(
 KOKORO_MODEL_DIR = os.path.join(DATA_DIR, "models", "kokoro")
 KOKORO_MODEL_PATH = os.path.join(KOKORO_MODEL_DIR, "kokoro-v1.0.onnx")
 KOKORO_VOICES_PATH = os.path.join(KOKORO_MODEL_DIR, "voices-v1.0.bin")
+KOKORO_MLX_MODEL_DIR = os.path.join(DATA_DIR, "models", "kokoro-mlx")
+KOKORO_MLX_MODEL = KOKORO_MLX_MODEL_DIR
 
 # Temporary files for processing
 TEMP_AIFF_PATH = os.path.join(TEMP_DIR, "temp_tts_audio_turn_{}.aiff")
@@ -92,6 +124,11 @@ MIN_CLIP_DURATION = 0.04
 import platform
 
 IS_MAC = platform.system() == "Darwin"
+AUDIO_MODES_FOR_PLATFORM = (
+    AUDIO_MODE_ORDER
+    if IS_MAC
+    else [mode for mode in AUDIO_MODE_ORDER if mode not in {"kokoro_mlx", "mac_say"}]
+)
 
 # --- HARDWARE ACCELERATION CONFIGURATION ---
 if IS_MAC:
@@ -123,9 +160,10 @@ try:
         with open(CHARACTER_CONFIG_FILE, "r") as f:
             CHARACTER_MAP = json.load(f)
     else:
-        print(
-            f"Error: Character config file '{CHARACTER_CONFIG_FILE}' not found. Using empty map."
-        )
+        # print(
+        #     f"Error: Character config file '{CHARACTER_CONFIG_FILE}' not found. Using empty map."
+        # )
+        pass
 except json.JSONDecodeError:
     print(
         f"Error: Character config file '{CHARACTER_CONFIG_FILE}' contains invalid JSON. Using empty map."

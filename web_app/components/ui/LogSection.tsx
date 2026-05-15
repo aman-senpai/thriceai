@@ -1,34 +1,70 @@
-// src/components/ui/LogSection.tsx
-import React from 'react';
-import { LogMessage, LogType } from '../../types'; // Adjust path
-import { cardClasses, primaryBlue, dangerRed } from '../../lib/constants'; // Adjust path
+import React from "react";
+import { LogMessage } from "@/types";
 
 interface LogSectionProps {
-    logMessages: LogMessage[];
-    setLogMessages: (messages: LogMessage[]) => void;
+  logMessages: LogMessage[];
+  refreshLists: () => void;
+  onClose?: () => void;
 }
 
-const logColorClasses: Record<LogType, string> = {
-    info: "text-primary-blue",
-    error: "text-danger-red",
-    warn: "text-warning-yellow",
-    success: "text-success-green",
-};
-
-export const LogSection: React.FC<LogSectionProps> = ({ logMessages, setLogMessages }) => (
-    <div className={cardClasses}>
-        <h2 className={`text-2xl font-bold mb-4 ${primaryBlue} flex justify-between items-center border-b border-dark-border/50 pb-3`}>
-            <i className="fas fa-terminal mr-2"></i> Terminal Log
-            <button onClick={() => setLogMessages([])} className="text-gray-400 hover:text-danger-red transition text-base font-normal flex items-center">
-                 <i className="fas fa-trash-alt mr-1"></i> Clear Log
-            </button>
-        </h2>
-        <pre id="log-output" className="h-64 overflow-y-auto font-mono text-xs bg-dark-bg/50 p-3 rounded-xl border border-dark-border/70 custom-scrollbar">
-            {logMessages.map((log, idx) => (
-                <div key={idx} className={`${logColorClasses[log.type]} whitespace-pre-wrap leading-relaxed`}>
-                    <span className="text-gray-500">[{log.timestamp}]</span> {log.message}
-                </div>
-            ))}
-        </pre>
+export const LogSection = ({
+  logMessages,
+  refreshLists,
+  onClose,
+}: LogSectionProps) => (
+  <div className="bg-card text-card-foreground p-4 rounded-2xl shadow-sm border border-border h-full flex flex-col min-h-0">
+    <div className="flex justify-between items-center mb-3 shrink-0">
+      <div className="flex items-center gap-2">
+        <div className="p-1.5 bg-secondary rounded-lg text-secondary-foreground">
+          <i className="fas fa-terminal text-xs"></i>
+        </div>
+        <h2 className="text-xs font-bold text-foreground">Activity Log</h2>
+      </div>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={refreshLists}
+          className="p-1 px-2 text-muted-foreground hover:text-foreground transition rounded hover:bg-secondary"
+          title="Refresh"
+        >
+          <i className="fas fa-sync text-xs"></i>
+        </button>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="p-1 px-2 text-muted-foreground hover:text-destructive transition rounded hover:bg-secondary"
+            title="Close Panel"
+          >
+            <i className="fas fa-times text-xs"></i>
+          </button>
+        )}
+      </div>
     </div>
+    <div className="flex-1 overflow-y-auto custom-scrollbar font-mono text-[10px] p-3 bg-secondary/30 rounded-xl border border-border space-y-1.5 shadow-inner min-h-0 h-full max-h-full">
+      {logMessages.length === 0 && (
+        <span className="text-muted-foreground italic">System ready...</span>
+      )}
+      {[...logMessages]
+        .reverse()
+        .filter((log) => !log.message.startsWith("PROGRESS:"))
+        .map((log, idx) => (
+        <div key={idx} className="flex gap-2 leading-tight">
+          <span className="text-muted-foreground shrink-0 select-none opacity-50">
+            {log.timestamp}
+          </span>
+          <span
+            className={`${log.type === "error"
+              ? "text-destructive font-bold"
+              : log.type === "success"
+                ? "text-emerald-600 dark:text-emerald-400"
+                : log.type === "warn"
+                  ? "text-amber-500"
+                  : "text-foreground/80"
+              } break-words`}
+          >
+            {log.message}
+          </span>
+        </div>
+      ))}
+    </div>
+  </div>
 );

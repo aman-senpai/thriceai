@@ -110,3 +110,11 @@ yarn-error.log*
 # ------------------------------------
 test_run.py
 data/assets/pip/
+
+
+## scratch
+scratch/
+
+## code-review-graph
+.code-review-graph/
+code-review-graph/

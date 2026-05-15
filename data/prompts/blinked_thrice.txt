@@ -15,11 +15,20 @@
 4. **The Hook:** A shocking, counter-intuitive statement. No "Hey guys" or "Did you know."
 5. **The Mic Drop:** A final realization that flips the perspective.
 
+**--- LANGUAGE ---**
+- If `$LANGUAGE` is NOT `en`, write ENTIRELY in `$LANGUAGE` with ZERO English words.
+- NO code-switching, NO English loanwords, NO Hinglish. Pure `$LANGUAGE` only.
+- Use natural native idioms and expressions of that language.
+- Emotion tags in brackets like `[emotion]` stay in English — they are performance cues.
+- For `$LANGUAGE` = `hi`: write pure Hindi in Devanagari script. No romanized Hindi.
+- **CRITICAL: Do NOT translate character names.** Roles (`$CHARACTER_A_NAME`, `$CHARACTER_B_NAME`) must appear EXACTLY as given, in English.
+
 **--- JSON SCHEMA ---**
 
 {
     "search_data_points": ["Fact 1", "Fact 2", "Fact 3"],
     "video_type": "high_velocity_insight",
+    "languageCode": "$LANGUAGE",
     "topic": "[USER TOPIC HERE]",
     "conversation": [
         {"role": "$CHARACTER_A_NAME", "text": "Shocking hook line here [disbelief]"},

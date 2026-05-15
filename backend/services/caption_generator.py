@@ -8,23 +8,40 @@ from openai import OpenAI
 # Assuming CAPTION_DIR and CAPTION_SYSTEM_PROMPT_PATH are in config
 try:
     try:
-        from ..config import CAPTION_DIR, CAPTION_SYSTEM_PROMPT_PATH
+        from ..config import CAPTION_DIR, CAPTION_SYSTEM_PROMPT_PATH, LLM_PROVIDER, DEEPSEEK_API_KEY_NAME, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
     except ImportError:
-        from config import CAPTION_DIR, CAPTION_SYSTEM_PROMPT_PATH
+        from config import CAPTION_DIR, CAPTION_SYSTEM_PROMPT_PATH, LLM_PROVIDER, DEEPSEEK_API_KEY_NAME, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
 except ImportError:
     # Fallback/error handling if config isn't set up yet
     CAPTION_DIR = "outputs/captions" # This likely won't work perfectly but serves as a fallback
     CAPTION_SYSTEM_PROMPT_PATH = "prompts/captions/blinked_thrice.txt"
+    LLM_PROVIDER = "openai"
+    DEEPSEEK_API_KEY_NAME = "DEEPSEEK_API_KEY"
+    DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+    DEEPSEEK_MODEL = "deepseek-v4-pro"
     print("Warning: Could not import config variables for caption generation.")
-
 
 
 load_dotenv()
 client = None
-try:
-    client = OpenAI()
-except Exception as e:
-    print(f"Error initializing OpenAI client for caption generation: {e}")
+CAPTION_MODEL = "gpt-4o-mini"
+
+if LLM_PROVIDER == "deepseek":
+    api_key = os.getenv(DEEPSEEK_API_KEY_NAME)
+    if api_key:
+        client = OpenAI(api_key=api_key, base_url=DEEPSEEK_BASE_URL)
+        CAPTION_MODEL = DEEPSEEK_MODEL
+    else:
+        print(f"Error: {DEEPSEEK_API_KEY_NAME} not set. Falling back to OpenAI.")
+        try:
+            client = OpenAI()
+        except Exception as e:
+            print(f"Error initializing OpenAI client for caption generation: {e}")
+else:
+    try:
+        client = OpenAI()
+    except Exception as e:
+        print(f"Error initializing OpenAI client for caption generation: {e}")
 
 def load_system_prompt() -> str:
     """Loads the system prompt from the dedicated text file."""
@@ -65,10 +82,10 @@ def generate_caption(script_file_path: str) -> str | bool:
 
     # 2. Call the API
     try:
-        print(f"Generating Instagram caption for script: '{script_file_path}'...")
+        # print(f"Generating Instagram caption for script: '{script_file_path}'...")
         
         res = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=CAPTION_MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": script_json_str}
@@ -86,9 +103,9 @@ def generate_caption(script_file_path: str) -> str | bool:
         with open(caption_file_path, "w", encoding="utf-8") as f:
             f.write(caption_text)
 
-        print(f"\n✅ Caption saved to: {caption_file_path}")
-        if usage:
-            print(f"Tokens Used → Prompt: {usage.prompt_tokens}, Completion: {usage.completion_tokens}, Total: {usage.total_tokens}")
+        # print(f"\n✅ Caption saved to: {caption_file_path}")
+        # if usage:
+        #     print(f"Tokens Used → Prompt: {usage.prompt_tokens}, Completion: {usage.completion_tokens}, Total: {usage.total_tokens}")
 
         return caption_text
         

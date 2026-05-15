@@ -122,7 +122,7 @@ def generate_audio(text, voice_name, output_path, turn_index, voice_id=None):
     if not is_service_available():
         raise Exception("Gemini API key not found. Please set GEMINI_API_KEY.")
 
-    print(f"  > Gemini TTS: Generating audio for turn {turn_index} with voice '{voice_name}'.")
+    # print(f"  > Gemini TTS: Generating audio for turn {turn_index} with voice '{voice_name}'.")
 
     client = _get_client()
 
@@ -194,7 +194,7 @@ def generate_audio(text, voice_name, output_path, turn_index, voice_id=None):
             with open(output_path, "wb") as f:
                 f.write(wav_data)
 
-            print(f"  > Gemini TTS: Successfully saved audio to {output_path}")
+            # print(f"  > Gemini TTS: Successfully saved audio to {output_path}")
             return output_path
 
         except Exception as file_save_error:

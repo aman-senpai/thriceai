@@ -8,11 +8,13 @@ from concurrent.futures import ThreadPoolExecutor
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from config import AUDIO_MODES_FOR_PLATFORM
 
 # Load environment variables
 load_dotenv()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT")
+DEFAULT_AUDIO_MODE = AUDIO_MODES_FOR_PLATFORM[0]
 
 # Load authorized user IDs from environment
 AUTHORIZED_USERS_STR = os.getenv("AUTHORIZED_TELEGRAM_USERS", "")
@@ -208,7 +210,8 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await unauthorized_response(update)
         return
     
-    help_text = """🎬 Faceless Reel Generator Bot
+    audio_modes = ", ".join(AUDIO_MODES_FOR_PLATFORM)
+    help_text = f"""🎬 Faceless Reel Generator Bot
 
 📝 Script Commands:
 • /script topic filename - Generate new script
@@ -231,7 +234,7 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 /script benefits of yoga yoga_benefits
 /generate yoga_benefits
 
-🔊 Audio: gemini, elevenlabs, mac_say
+🔊 Audio: {audio_modes}
 """
     await update.message.reply_text(help_text)
 
@@ -309,9 +312,9 @@ async def generate_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
     
     # Get audio mode (optional second argument)
-    audio_mode = context.args[1] if len(context.args) > 1 else "gemini"
-    if audio_mode not in ["gemini", "elevenlabs", "mac_say"]:
-        audio_mode = "gemini"
+    audio_mode = context.args[1] if len(context.args) > 1 else DEFAULT_AUDIO_MODE
+    if audio_mode not in AUDIO_MODES_FOR_PLATFORM:
+        audio_mode = DEFAULT_AUDIO_MODE
     
     generation_status["running"] = True
     await update.message.reply_text(
@@ -399,9 +402,9 @@ async def generate_all_handler(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text("📁 No content scripts found.")
         return
     
-    audio_mode = context.args[0] if context.args else "gemini"
-    if audio_mode not in ["gemini", "elevenlabs", "mac_say"]:
-        audio_mode = "gemini"
+    audio_mode = context.args[0] if context.args else DEFAULT_AUDIO_MODE
+    if audio_mode not in AUDIO_MODES_FOR_PLATFORM:
+        audio_mode = DEFAULT_AUDIO_MODE
     
     generation_status["running"] = True
     await update.message.reply_text(
@@ -596,7 +599,7 @@ async def reel_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 
             # 2. Generate Reel
             generation_status["progress"] = "Step 2/3: Creating Video..."
-            reel_success, reel_msg = generate_reel_sync(filename, "gemini")
+            reel_success, reel_msg = generate_reel_sync(filename, DEFAULT_AUDIO_MODE)
             
             if not reel_success:
                 raise Exception(f"Reel generation failed: {reel_msg}")
@@ -698,9 +701,9 @@ async def run_bot_async() -> None:
     ))
 
     # Initialize and start
-    print("🤖 Telegram Bot starting...")
-    print(f"   Authorized users: {len(AUTHORIZED_USERS)} configured")
-    print("   Commands: /help, /reel, /script, /prompts, /characters, /list, /generate, /status")
+    # print("🤖 Telegram Bot starting...")
+    # print(f"   Authorized users: {len(AUTHORIZED_USERS)} configured")
+    # print("   Commands: /help, /reel, /script, /prompts, /characters, /list, /generate, /status")
     
     # Use run_polling for proper lifecycle management
     await application.run_polling(poll_interval=3.0, stop_signals=None)
@@ -720,6 +723,10 @@ def start_bot() -> None:
     try:
         asyncio.run(run_bot_async())
     except (KeyboardInterrupt, SystemExit):
-        print("Bot process stopped.")
+        # print("Bot process stopped.")
+        pass
+    except RuntimeError as e:
+        if "Event loop is closed" not in str(e) and "Cannot close a running event loop" not in str(e):
+            print(f"Bot Loop Error: {e}")
     except Exception as e:
         print(f"Error in bot process: {e}")

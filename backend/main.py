@@ -216,7 +216,7 @@ def run_web_ui(headless: bool = False, dev_mode: bool = False):
             allow_headers=["*"],
         )
 
-        config = uvicorn.Config(server.app, host="0.0.0.0", port=8008, log_level="info")
+        config = uvicorn.Config(server.app, host="0.0.0.0", port=8008, log_level="warning")
         server_instance = uvicorn.Server(config)
 
         # Store server reference for shutdown

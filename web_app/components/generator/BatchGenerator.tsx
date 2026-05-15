@@ -31,15 +31,19 @@ export const BatchGenerator: React.FC<BatchGeneratorProps> = ({
     const [jobs, setJobs] = useState<BatchJob[]>([]);
     const [isGenerating, setIsGenerating] = useState(false);
     const [audioMode, setAudioMode] = useState("");
+    const [llmProvider, setLlmProvider] = useState("");
     const [jsonInput, setJsonInput] = useState("");
     const [isJsonInputVisible, setIsJsonInputVisible] = useState(false);
 
-    // Initialize audio mode from config
+    // Initialize audio mode and llm provider from config
     React.useEffect(() => {
         if (config?.audio_modes && !audioMode) {
             setAudioMode(Object.keys(config.audio_modes)[0] || "");
         }
-    }, [config, audioMode]);
+        if (config?.llm_providers && !llmProvider) {
+            setLlmProvider(config.current_llm_provider || Object.keys(config.llm_providers)[0] || "");
+        }
+    }, [config, audioMode, llmProvider]);
 
     const addJob = () => {
         const charKeys = Object.keys(config?.characters || {});
@@ -151,6 +155,7 @@ export const BatchGenerator: React.FC<BatchGeneratorProps> = ({
                     pip_asset: j.pip_asset,
                 })),
                 audio_mode: audioMode || "default",
+                llm_provider: llmProvider || "gemini",
             };
 
             const result = await postJson("/api/generate-reel/batch", payload);
@@ -170,7 +175,7 @@ export const BatchGenerator: React.FC<BatchGeneratorProps> = ({
         <div className="bg-card text-card-foreground p-6 rounded-2xl shadow-sm border border-border space-y-4 h-full flex flex-col">
             <div className="flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-emerald-600/10 rounded-xl text-emerald-600 flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 bg-primary/10 rounded-xl text-primary flex items-center justify-center shrink-0">
                         <i className="fas fa-layer-group"></i>
                     </div>
                     <div>
@@ -181,7 +186,7 @@ export const BatchGenerator: React.FC<BatchGeneratorProps> = ({
                 <div className="flex items-center gap-2">
                     <button
                         onClick={() => setIsJsonInputVisible(!isJsonInputVisible)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 border ${isJsonInputVisible ? 'bg-emerald-600/10 border-emerald-600/50 text-emerald-600 font-black' : 'bg-secondary text-muted-foreground border-border hover:border-primary/50'}`}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 border ${isJsonInputVisible ? 'bg-primary/10 border-primary/50 text-primary font-black' : 'bg-secondary text-muted-foreground border-border hover:border-primary/50'}`}
                         title="Bulk Add via JSON"
                     >
                         <i className={`fas ${isJsonInputVisible ? 'fa-keyboard' : 'fa-code'}`}></i>
@@ -238,7 +243,7 @@ export const BatchGenerator: React.FC<BatchGeneratorProps> = ({
                         <button
                             onClick={handleAddFromJson}
                             disabled={!jsonInput.trim()}
-                            className="flex-1 py-2 bg-emerald-600 text-white rounded-lg text-[10px] font-bold hover:bg-emerald-700 transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                            className="flex-1 py-2 bg-primary text-primary-foreground rounded-lg text-[10px] font-bold hover:bg-primary/90 transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 shadow-primary/20"
                         >
                             <i className="fas fa-magic"></i> Process & Add to Queue
                         </button>
@@ -274,96 +279,125 @@ export const BatchGenerator: React.FC<BatchGeneratorProps> = ({
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2">
+            {/* Script Writer Provider Selection */}
+            <div className="bg-secondary/20 p-4 rounded-xl border border-border/50 shrink-0">
+                <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3">
+                    <i className="fas fa-feather mr-1.5"></i> Script Writer Provider
+                </label>
+                <div className="flex flex-wrap gap-2">
+                    {config && Object.entries(config.llm_providers as Record<string, string>).map(([key, label]) => {
+                        const isSelected = llmProvider === key;
+
+                        return (
+                            <button
+                                key={key}
+                                type="button"
+                                onClick={() => setLlmProvider(key)}
+                                disabled={isGenerating}
+                                className={`px-4 py-2 rounded-full text-[10px] sm:text-xs font-bold transition-all duration-200 border capitalize shadow-sm ${isSelected
+                                    ? "bg-primary text-primary-foreground border-primary scale-105"
+                                    : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
+                                    }`}
+                            >
+                                {label}
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
                 {jobs.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground opacity-50">
-                        <i className="fas fa-film text-4xl mb-3"></i>
-                        <p className="text-xs font-medium">No videos added to batch yet.</p>
+                    <div className="flex flex-col items-center justify-center py-20 text-muted-foreground bg-muted/10 rounded-2xl border-2 border-dashed border-border/50">
+                        <div className="w-16 h-16 bg-muted/20 rounded-full flex items-center justify-center mb-4">
+                            <i className="fas fa-film text-2xl opacity-40"></i>
+                        </div>
+                        <p className="text-xs font-bold uppercase tracking-widest opacity-60">No videos in queue</p>
                     </div>
                 ) : (
                     jobs.map((job) => (
-                        <div key={job.id} className="bg-secondary/30 border border-border rounded-xl p-4 space-y-3 relative group">
+                        <div key={job.id} className="bg-card border border-border rounded-2xl p-5 space-y-4 relative group hover:border-primary/40 transition-all shadow-sm">
                             <button
                                 onClick={() => removeJob(job.id)}
-                                className="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded-full bg-destructive/10 text-destructive hover:bg-destructive hover:text-white transition-all z-10"
+                                className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-xl bg-destructive/10 text-destructive hover:bg-destructive hover:text-white transition-all z-10 opacity-0 group-hover:opacity-100"
                                 title="Remove Job"
                             >
-                                <i className="fas fa-times text-xs"></i>
+                                <i className="fas fa-trash-alt text-[10px]"></i>
                             </button>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div>
-                                    <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">Topic</label>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="block text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1">Video Topic</label>
                                     <input
                                         type="text"
                                         value={job.topic}
                                         onChange={(e) => updateJob(job.id, { topic: e.target.value })}
-                                        className={`${CLEAN_INPUT} !py-2 !text-xs`}
-                                        placeholder="e.g. History of Rome"
+                                        className={`${CLEAN_INPUT} !py-2.5 !text-xs !rounded-lg bg-secondary/30`}
+                                        placeholder="What is this video about?"
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">Filename (Optional)</label>
-                                    <input
-                                        type="text"
-                                        value={job.file_name}
-                                        onChange={(e) => updateJob(job.id, { file_name: e.target.value })}
-                                        className={`${CLEAN_INPUT} !py-2 !text-xs`}
-                                        placeholder="video_filename"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">Prompt Template</label>
-                                    <select
-                                        value={job.prompt_filename}
-                                        onChange={(e) => updateJob(job.id, { prompt_filename: e.target.value })}
-                                        className={`${CLEAN_INPUT} !py-2 !text-xs appearance-none`}
-                                    >
-                                        {config && Object.entries(config.prompts).map(([path, name]) => (
-                                            <option key={path} value={path}>{name as string}</option>
-                                        ))}
-                                    </select>
+                                <div className="space-y-1.5">
+                                    <label className="block text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1">Template</label>
+                                    <div className="relative">
+                                        <select
+                                            value={job.prompt_filename}
+                                            onChange={(e) => updateJob(job.id, { prompt_filename: e.target.value })}
+                                            className={`${CLEAN_INPUT} !py-2.5 !text-xs !rounded-lg bg-secondary/30 appearance-none cursor-pointer`}
+                                        >
+                                            {config && Object.entries(config.prompts).map(([path, name]) => (
+                                                <option key={path} value={path}>{name as string}</option>
+                                            ))}
+                                        </select>
+                                        <i className="fas fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none"></i>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-3 gap-4 items-end">
-                                <div className="col-span-1">
-                                    <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">Characters</label>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                                <div className="space-y-1.5">
+                                    <label className="block text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1">Actors</label>
                                     <div className="flex gap-2">
-                                        <select
-                                            value={job.character_a}
-                                            onChange={(e) => updateJob(job.id, { character_a: e.target.value })}
-                                            className={`${CLEAN_INPUT} !py-2 !text-[10px] appearance-none`}
-                                        >
-                                            {config && Object.keys(config.characters).map((name) => (
-                                                <option key={name} value={name}>{name}</option>
-                                            ))}
-                                        </select>
-                                        <select
-                                            value={job.character_b}
-                                            onChange={(e) => updateJob(job.id, { character_b: e.target.value })}
-                                            className={`${CLEAN_INPUT} !py-2 !text-[10px] appearance-none`}
-                                        >
-                                            {config && Object.keys(config.characters).map((name) => (
-                                                <option key={name} value={name}>{name}</option>
-                                            ))}
-                                        </select>
+                                        <div className="relative flex-1">
+                                            <select
+                                                value={job.character_a}
+                                                onChange={(e) => updateJob(job.id, { character_a: e.target.value })}
+                                                className={`${CLEAN_INPUT} !py-2 !text-[11px] !rounded-lg bg-secondary/30 appearance-none cursor-pointer`}
+                                            >
+                                                {config && Object.keys(config.characters).map((name) => (
+                                                    <option key={name} value={name}>{name}</option>
+                                                ))}
+                                            </select>
+                                            <i className="fas fa-user absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground pointer-events-none"></i>
+                                        </div>
+                                        <div className="flex items-center text-[10px] font-black text-muted-foreground">VS</div>
+                                        <div className="relative flex-1">
+                                            <select
+                                                value={job.character_b}
+                                                onChange={(e) => updateJob(job.id, { character_b: e.target.value })}
+                                                className={`${CLEAN_INPUT} !py-2 !text-[11px] !rounded-lg bg-secondary/30 appearance-none cursor-pointer`}
+                                            >
+                                                {config && Object.keys(config.characters).map((name) => (
+                                                    <option key={name} value={name}>{name}</option>
+                                                ))}
+                                            </select>
+                                            <i className="fas fa-user absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-muted-foreground pointer-events-none"></i>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div className="col-span-2 flex items-center gap-3">
-                                    <div className="flex-1">
-                                        <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">PIP Asset</label>
-                                        <div className="relative">
-                                            <input
-                                                type="file"
-                                                onChange={(e) => handlePipUpload(job.id, e)}
-                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                            />
-                                            <div className="border border-border bg-background rounded-lg px-3 py-2 text-[10px] truncate flex items-center gap-2">
-                                                <i className="fas fa-upload text-muted-foreground"></i>
-                                                {job.pip_asset || "Upload PIP video/image"}
-                                            </div>
+                                <div className="space-y-1.5">
+                                    <label className="block text-[9px] font-black text-muted-foreground uppercase tracking-widest ml-1">Overlay Asset (Optional)</label>
+                                    <div className="relative group/pip">
+                                        <input
+                                            type="file"
+                                            onChange={(e) => handlePipUpload(job.id, e)}
+                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                                        />
+                                        <div className="border border-border bg-secondary/30 rounded-lg px-4 py-2.5 text-[11px] font-bold text-foreground truncate flex items-center gap-2 group-hover/pip:border-primary/50 transition-colors">
+                                            <i className="fas fa-paperclip text-muted-foreground"></i>
+                                            {job.pip_asset ? (
+                                                <span className="text-primary">{job.pip_asset}</span>
+                                            ) : "Attach media..."}
                                         </div>
                                     </div>
                                 </div>

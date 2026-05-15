@@ -39,7 +39,7 @@ export const FileList: React.FC<FileListProps> = ({
         <div className="bg-card text-card-foreground p-5 sm:p-6 rounded-2xl shadow-sm border border-border h-full flex flex-col">
             <h2 className="text-lg sm:text-xl font-bold mb-4 sm:mb-6 text-foreground flex justify-between items-center">
                 <span className="flex items-center gap-2 sm:gap-3">
-                    <div className={`w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl shrink-0 ${isContentList ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'}`}>
+                    <div className={`w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center rounded-xl shrink-0 shadow-sm border ${isContentList ? 'bg-amber-500/10 border-amber-500/20 text-amber-600' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-600'}`}>
                         <i className={`fas ${isContentList ? 'fa-file-lines' : 'fa-film'} text-sm sm:text-base`}></i>
                     </div>
                     {title}
@@ -64,15 +64,15 @@ export const FileList: React.FC<FileListProps> = ({
                     data.map((item, index) => (
                         <div key={index} className="group flex justify-between items-center p-3 sm:p-4 rounded-xl bg-background hover:bg-secondary/50 border border-border hover:border-border/80 transition-all shadow-sm hover:shadow-md">
                             <div className="min-w-0 pr-4">
-                                <p className="font-semibold text-foreground truncate">{removeExtension(item.name)}</p>
-                                <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground font-medium">
-                                    <span>{formatTimestamp(item.modified)}</span>
+                                <p className="font-bold text-foreground truncate group-hover:text-primary transition-colors">{removeExtension(item.name)}</p>
+                                <div className="flex items-center gap-2 mt-1.5 text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
+                                    <span className="bg-secondary px-2 py-0.5 rounded text-secondary-foreground">{formatTimestamp(item.modified)}</span>
                                     {isContentList ? (
-                                        <span className="bg-secondary px-2 py-0.5 rounded-full text-secondary-foreground truncate max-w-[150px]">
+                                        <span className="px-2 py-0.5 rounded border border-border truncate max-w-[150px]">
                                             {(item as ContentItem).query}
                                         </span>
                                     ) : (
-                                        <span className="bg-secondary px-2 py-0.5 rounded-full text-secondary-foreground">
+                                        <span className="px-2 py-0.5 rounded border border-border">
                                             {(item as ReelItem).size_kb.toFixed(1)} KB
                                         </span>
                                     )}

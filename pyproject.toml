@@ -58,6 +58,8 @@ dependencies = [
     "whisper-timestamped>=1.15.9",
     "youtube-transcript-api>=1.2.4",
     "feedparser>=6.0.12",
+    "misaki[en]>=0.9.4",
+    "av>=17.0.1",
 ]
 
 [build-system]

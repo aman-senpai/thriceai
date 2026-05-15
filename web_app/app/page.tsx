@@ -3,13 +3,19 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { FileList } from "@/components/lists/FileList";
 import VideoModals, { VideoModalsProps } from "@/components/modals/VideoModals";
+import ConfirmationModal from "@/components/modals/ConfirmationModal";
 import { AddCharacterModal } from "@/components/modals/AddCharacterModal";
 import { AddPromptModal } from "@/components/modals/AddPromptModal";
 import { BatchGenerator } from "@/components/generator/BatchGenerator";
-import { FeedSection, RSSVideo, FeedSectionProps } from "@/components/generator/FeedSection";
+import {
+  FeedSection,
+  RSSVideo,
+  FeedSectionProps,
+} from "@/components/generator/FeedSection";
 import { EditChannelsModal } from "@/components/modals/EditChannelsModal";
-
-// Styling constants are now imported from @/lib/constants to ensure consistent theming
+import { useLogStream } from "@/hooks/useLogStream";
+import { Header } from "@/components/ui/Header";
+import { LogSection } from "@/components/ui/LogSection";
 
 // --- 1. Type Definitions (Preserved and Exported) ---
 interface CharacterDetails {
@@ -17,6 +23,8 @@ interface CharacterDetails {
   voice_gemini?: string;
   voice_eleven?: string;
   voice_mac?: string;
+  voice_kokoro?: string;
+  voice_kokoro_mlx?: string;
 }
 
 interface ConfigData {
@@ -24,7 +32,11 @@ interface ConfigData {
   characters: Record<string, CharacterDetails>;
   audio_modes: Record<string, string>;
   prompts: Record<string, string>;
+  llm_providers: Record<string, string>;
+  current_llm_provider: string;
   max_query_length: number;
+  kokoro_voices: Record<string, string[]>;
+  languages: { code: string; name: string }[];
 }
 
 interface ReelItem {
@@ -131,125 +143,6 @@ interface HeaderProps {
   toggleLog: () => void;
 }
 
-const Header = ({
-  refreshLists,
-  isReelGenerating,
-  isContentGenerating,
-  isReelsLoading,
-  isContentsLoading,
-  isDark,
-  toggleTheme,
-  activeTab,
-  setActiveTab,
-  isLogVisible,
-  toggleLog,
-}: HeaderProps) => (
-  <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border px-3 py-3 md:px-6 md:py-4 shrink-0 transition-all duration-300">
-    <div className="flex justify-between items-center max-w-[1920px] mx-auto">
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 md:w-10 md:h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
-          <i className="fas fa-layer-group text-primary-foreground text-sm md:text-base"></i>
-        </div>
-        <div>
-          <h1 className="text-lg md:text-xl font-black tracking-tight text-foreground leading-none">
-            Reel Gen
-          </h1>
-          <p className="text-[10px] md:text-xs text-muted-foreground font-medium hidden sm:block mt-0.5">
-            Create content fast.
-          </p>
-        </div>
-      </div>
-      <div className="flex items-center gap-2">
-        {/* Desktop Tab Navigation */}
-        <div className="hidden md:flex bg-muted p-1 rounded-xl mr-4">
-          <button
-            onClick={() => setActiveTab("studio")}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === "studio" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            Studio
-          </button>
-          <button
-            onClick={() => setActiveTab("feed")}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === "feed" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            Feed
-          </button>
-          <button
-            onClick={() => setActiveTab("batch")}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === "batch" ? "bg-emerald-600 text-white shadow-sm" : "text-muted-foreground hover:text-emerald-600"}`}
-          >
-            Batch
-          </button>
-        </div>
-
-        <button
-          onClick={() => setActiveTab("log")}
-          className="w-9 h-9 md:w-10 md:h-10 flex md:hidden items-center justify-center rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all active:scale-95"
-          title="Terminal"
-        >
-          <i className="fas fa-terminal text-sm md:text-base"></i>
-        </button>
-        <button
-          onClick={toggleLog}
-          className={`hidden md:flex w-9 h-9 md:w-10 md:h-10 items-center justify-center rounded-xl transition-all active:scale-95 ${isLogVisible ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" : "bg-secondary text-secondary-foreground hover:bg-secondary/80"}`}
-          title="Toggle Terminal"
-        >
-          <i className="fas fa-terminal text-sm md:text-base"></i>
-        </button>
-        <button
-          onClick={toggleTheme}
-          className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all active:scale-95"
-          title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-        >
-          <i
-            className={`fas ${isDark ? "fa-sun" : "fa-moon"} text-sm md:text-base`}
-          ></i>
-        </button>
-        <button
-          onClick={refreshLists}
-          disabled={isReelGenerating || isContentGenerating}
-          className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all active:scale-95 disabled:opacity-50"
-          title="Refresh Lists"
-        >
-          <i
-            className={`fas fa-sync text-sm md:text-base ${isReelsLoading || isContentsLoading ? "animate-spin" : ""}`}
-          ></i>
-        </button>
-      </div>
-    </div>
-    {/* Mobile Tab Navigation (Unchanged) */}
-    <nav className="flex gap-1 mt-3 md:hidden">
-      {[
-        { id: "studio", label: "Studio", icon: "fa-feather" },
-        { id: "feed", label: "Feed", icon: "fa-rss" },
-        { id: "files", label: "Files", icon: "fa-folder" },
-        { id: "log", label: "Log", icon: "fa-terminal" },
-      ].map((tab) => (
-        <button
-          key={tab.id}
-          onClick={() => setActiveTab(tab.id)}
-          className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${activeTab === tab.id
-            ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
-            : "bg-muted text-muted-foreground hover:text-foreground"
-            }`}
-        >
-          <i className={`fas ${tab.icon}`}></i>
-          {tab.label}
-        </button>
-      ))}
-      <button
-        onClick={() => setActiveTab("batch")}
-        className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${activeTab === "batch"
-          ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
-          : "bg-muted text-muted-foreground hover:text-foreground"
-          }`}
-      >
-        <i className="fas fa-magic"></i>
-        Batch
-      </button>
-    </nav>
-  </header>
-);
 interface GenerateContentFormProps {
   config: ConfigData | null;
   charA: string;
@@ -258,8 +151,12 @@ interface GenerateContentFormProps {
   setCharB: React.Dispatch<React.SetStateAction<string>>;
   audioMode: string;
   setAudioMode: React.Dispatch<React.SetStateAction<string>>;
+  llmProvider: string;
+  setLlmProvider: React.Dispatch<React.SetStateAction<string>>;
   promptPath: string;
   setPromptPath: React.Dispatch<React.SetStateAction<string>>;
+  language: string;
+  setLanguage: React.Dispatch<React.SetStateAction<string>>;
   query: string;
   handleQueryChange: (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -319,10 +216,11 @@ const CharacterScroll = ({
               onClick={() =>
                 !isExcluded && !isContentGenerating && onSelect(key)
               }
-              className={`relative shrink-0 w-14 h-14 md:w-16 md:h-16 rounded-xl overflow-hidden transition-all duration-200 bg-muted ${isSelected
-                ? "ring-2 ring-primary shadow-lg scale-105"
-                : "opacity-70 hover:opacity-100 hover:scale-105 grayscale hover:grayscale-0"
-                }`}
+              className={`relative shrink-0 w-16 h-16 rounded-2xl overflow-hidden transition-all duration-300 bg-muted border-2 ${
+                isSelected
+                  ? "border-primary shadow-lg shadow-primary/20 scale-105"
+                  : "border-transparent opacity-60 hover:opacity-100 hover:scale-105 grayscale hover:grayscale-0"
+              }`}
             >
               <img
                 src={
@@ -363,8 +261,12 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
   setCharB,
   audioMode,
   setAudioMode,
+  llmProvider,
+  setLlmProvider,
   promptPath,
   setPromptPath,
+  language,
+  setLanguage,
   query,
   handleQueryChange,
   fileName,
@@ -407,41 +309,94 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
         {/* Form Inputs & Button (Moved to Top) */}
         <div className="shrink-0 space-y-3">
           <div className="bg-secondary/30 rounded-xl p-4 border border-border space-y-3">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                  Prompt Template
-                </label>
-                <button
-                  type="button"
-                  onClick={onAddPrompt}
-                  className="w-6 h-6 flex items-center justify-center bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 transition-all"
-                  title="Add New Prompt"
-                >
-                  <i className="fas fa-plus text-[10px]"></i>
-                </button>
+            {/* Dropdowns Row */}
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1.5 px-1">
+                  <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                    Template
+                  </label>
+                </div>
+                <div className="flex gap-2">
+                  <select
+                    value={promptPath}
+                    onChange={(e) => setPromptPath(e.target.value)}
+                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer appearance-none"
+                    disabled={isConfigLoading || isContentGenerating}
+                  >
+                    {config &&
+                      Object.entries(config.prompts).map(([path, name]) => (
+                        <option key={path} value={path}>
+                          {name.replace(/\.[^/.]+$/, "")}
+                        </option>
+                      ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={onAddPrompt}
+                    className="shrink-0 w-8 h-8 flex items-center justify-center bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-all border border-border"
+                    title="Add New Prompt"
+                  >
+                    <i className="fas fa-plus text-[10px]"></i>
+                  </button>
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {config &&
-                  Object.entries(config.prompts).map(([path, name]) => {
-                    const isSelected = promptPath === path;
-                    const displayName = name.replace(/\.[^/.]+$/, ""); // Drop file extension
 
-                    return (
-                      <button
-                        key={path}
-                        type="button"
-                        onClick={() => setPromptPath(path)}
-                        disabled={isConfigLoading || isContentGenerating}
-                        className={`px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-bold transition-all duration-200 border ${isSelected
-                          ? "bg-primary text-primary-foreground border-primary shadow-sm transform scale-105"
-                          : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
-                          }`}
-                      >
-                        {displayName}
-                      </button>
-                    );
-                  })}
+              <div className="flex-1">
+                <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1.5 px-1">
+                  Audio Mode
+                </label>
+                <select
+                  value={audioMode}
+                  onChange={(e) => setAudioMode(e.target.value)}
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer appearance-none capitalize"
+                  disabled={isConfigLoading || isContentGenerating}
+                >
+                  {config &&
+                    Object.keys(config.audio_modes).map((mode) => (
+                      <option key={mode} value={mode}>
+                        {mode.replace(/_/g, " ")}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div className="flex-1">
+                <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1.5 px-1">
+                  Script Writer
+                </label>
+                <select
+                  value={llmProvider}
+                  onChange={(e) => setLlmProvider(e.target.value)}
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer appearance-none"
+                  disabled={isConfigLoading || isContentGenerating}
+                >
+                  {config &&
+                    Object.entries(config.llm_providers).map(([key, label]) => (
+                      <option key={key} value={key}>
+                        {label}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div className="flex-1">
+                <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1.5 px-1">
+                  Language
+                </label>
+                <select
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/50 cursor-pointer appearance-none uppercase"
+                  disabled={isConfigLoading || isContentGenerating}
+                >
+                  {config &&
+                    config.languages.map((lang) => (
+                      <option key={lang.code} value={lang.code}>
+                        {lang.name}
+                      </option>
+                    ))}
+                </select>
               </div>
             </div>
             <div>
@@ -457,9 +412,9 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-              <div className="md:col-span-3">
-                <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">
+            <div className="flex flex-col md:flex-row items-end gap-4">
+              <div className="flex-1 w-full">
+                <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1.5 px-1">
                   Filename
                 </label>
                 <input
@@ -467,45 +422,18 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
                   value={fileName}
                   onChange={handleFileNameChange}
                   placeholder="video_topic"
-                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-primary/50"
                   disabled={isConfigLoading || isContentGenerating}
                 />
               </div>
-              <div className="md:col-span-5">
-                <label className="block text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">
-                  Audio Mode
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {config &&
-                    Object.keys(config.audio_modes).map((mode) => {
-                      const isSelected = audioMode === mode;
-                      const displayName = mode.replace(/_/g, " ");
-
-                      return (
-                        <button
-                          key={mode}
-                          type="button"
-                          onClick={() => setAudioMode(mode)}
-                          disabled={isConfigLoading || isContentGenerating}
-                          className={`px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-bold transition-all duration-200 border capitalize ${isSelected
-                            ? "bg-primary text-primary-foreground border-primary shadow-sm transform scale-105"
-                            : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
-                            }`}
-                        >
-                          {displayName}
-                        </button>
-                      );
-                    })}
-                </div>
-              </div>
-              <div className="md:col-span-4">
+              <div className="w-full md:w-auto">
                 <GenerateButton
-                  onClick={() => { }}
+                  onClick={() => {}}
                   disabled={
                     !isConfigValid || isContentGenerating || isConfigLoading
                   }
                   isSubmit={true}
-                  className={`${primaryButtonClasses} !py-2.5 !text-xs`}
+                  className={`${primaryButtonClasses} !py-2 !text-xs md:px-10`}
                 >
                   {isContentGenerating ? (
                     <>
@@ -514,7 +442,7 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
                     </>
                   ) : (
                     <>
-                      <i className="fas fa-magic mr-1.5"></i> Generate Content
+                      <i className="fas fa-magic mr-1.5"></i> Generate
                     </>
                   )}
                 </GenerateButton>
@@ -529,8 +457,8 @@ const GenerateContentForm = React.memo(function GenerateContentForm({
           )}
         </div>
 
-        {/* Bottom Section: Characters and PIP Asset in Two Columns */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-border mt-auto">
+        {/* Bottom Section: Characters and PIP Asset */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 border-t border-border mt-auto items-start">
           {/* Column 1: Character Selection */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -696,64 +624,6 @@ interface LogSectionProps {
 }
 
 // Added explicit height constraint to LogSection container for safety
-const LogSection = ({
-  logMessages,
-  refreshLists,
-  onClose,
-}: LogSectionProps) => (
-  <div className="bg-card text-card-foreground p-4 rounded-2xl shadow-sm border border-border h-full flex flex-col min-h-0">
-    <div className="flex justify-between items-center mb-3 shrink-0">
-      <div className="flex items-center gap-2">
-        <div className="p-1.5 bg-secondary rounded-lg text-secondary-foreground">
-          <i className="fas fa-terminal text-xs"></i>
-        </div>
-        <h2 className="text-xs font-bold text-foreground">Activity Log</h2>
-      </div>
-      <div className="flex items-center gap-1">
-        <button
-          onClick={refreshLists}
-          className="p-1 px-2 text-muted-foreground hover:text-foreground transition rounded hover:bg-secondary"
-          title="Refresh"
-        >
-          <i className="fas fa-sync text-xs"></i>
-        </button>
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="p-1 px-2 text-muted-foreground hover:text-destructive transition rounded hover:bg-secondary"
-            title="Close Panel"
-          >
-            <i className="fas fa-times text-xs"></i>
-          </button>
-        )}
-      </div>
-    </div>
-    <div className="flex-1 overflow-y-auto custom-scrollbar font-mono text-[10px] p-3 bg-secondary/30 rounded-xl border border-border space-y-1.5 shadow-inner min-h-0 h-full max-h-full">
-      {logMessages.length === 0 && (
-        <span className="text-muted-foreground italic">System ready...</span>
-      )}
-      {[...logMessages].reverse().map((log, idx) => (
-        <div key={idx} className="flex gap-2 leading-tight">
-          <span className="text-muted-foreground shrink-0 select-none opacity-50">
-            {log.timestamp}
-          </span>
-          <span
-            className={`${log.type === "error"
-              ? "text-destructive font-bold"
-              : log.type === "success"
-                ? "text-emerald-600 dark:text-emerald-400"
-                : log.type === "warn"
-                  ? "text-amber-500"
-                  : "text-foreground/80"
-              } break-words`}
-          >
-            {log.message}
-          </span>
-        </div>
-      ))}
-    </div>
-  </div>
-);
 
 // --- 4. Main Component ---
 export default function Page() {
@@ -763,14 +633,16 @@ export default function Page() {
   const [config, setConfig] = useState<ConfigData | null>(null);
   const [reels, setReels] = useState<ReelItem[]>([]);
   const [contents, setContents] = useState<ContentItem[]>([]);
-  const [logMessages, setLogMessages] = useState<LogMessage[]>([]);
+  const { logMessages } = useLogStream(API_BASE_URL);
 
   const [charA, setCharA] = useState("");
   const [charB, setCharB] = useState("");
   const [audioMode, setAudioMode] = useState("");
+  const [llmProvider, setLlmProvider] = useState("");
   const [promptPath, setPromptPath] = useState("");
   const [query, setQuery] = useState("");
   const [fileName, setFileName] = useState("");
+  const [language, setLanguage] = useState("en");
   const [sessionCount, setSessionCount] = useState(0);
   const [contentStatus, setContentStatus] = useState("");
   const [reelStatus, setReelStatus] = useState("");
@@ -785,6 +657,8 @@ export default function Page() {
   const [isDialogueSaving, setIsDialogueSaving] = useState(false);
   const [pipAsset, setPipAsset] = useState<string | null>(null);
   const [isPipUploading, setIsPipUploading] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [currentJob, setCurrentJob] = useState<string | undefined>();
 
   // Modal State
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
@@ -801,13 +675,22 @@ export default function Page() {
   const [isAddPromptModalOpen, setIsAddPromptModalOpen] = useState(false);
   const [isEditChannelsModalOpen, setIsEditChannelsModalOpen] = useState(false);
   const [isLogVisible, setIsLogVisible] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    isDanger?: boolean;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+    isDanger: false,
+  });
 
   const log = useCallback((message: string, type: LogType = "info") => {
-    const now = new Date().toLocaleTimeString("en-US", { hour12: false });
-    setLogMessages((prev) => [
-      ...prev.slice(-500),
-      { timestamp: now, type, message },
-    ]);
+    console.log(`[${type}] ${message}`);
   }, []);
 
   // --- Data Fetching and Initialization ---
@@ -826,6 +709,9 @@ export default function Page() {
       setCharA(charKeys[0] || "");
       setCharB(charKeys[1] || "");
       setAudioMode(modeKeys[0] || "");
+      setLlmProvider(
+        data.current_llm_provider || Object.keys(data.llm_providers)[0] || "",
+      );
 
       // Default to blinked_thrice.txt if available, otherwise first prompt
       const defaultPrompt =
@@ -833,6 +719,11 @@ export default function Page() {
         promptKeys[0] ||
         "";
       setPromptPath(defaultPrompt);
+
+      // Set default language from config
+      if (data.languages && data.languages.length > 0) {
+        setLanguage(data.languages[0].code);
+      }
 
       log("Configuration loaded successfully.", "success");
     } catch (err: any) {
@@ -883,48 +774,32 @@ export default function Page() {
     fetchPipAsset();
   }, [loadConfig, refreshLists, fetchPipAsset]);
 
-  // --- SSE Connection for Terminal Logs ---
+  // Handle Progress Parsing from Logs
   useEffect(() => {
-    let eventSource: EventSource | null = null;
-    let reconnectTimeout: NodeJS.Timeout | null = null;
+    if (logMessages.length === 0) return;
+    const lastLog = logMessages[logMessages.length - 1].message;
+    if (lastLog.startsWith("PROGRESS:")) {
+      const parts = lastLog.split(":");
+      const progress = parseInt(parts[1]);
+      const filename = parts[2];
 
-    const connectToLogStream = () => {
-      eventSource = new EventSource(`${API_BASE_URL}/api/logs/stream`);
+      if (!isNaN(progress)) {
+        setGenerationProgress(progress);
+        if (filename) setCurrentJob(filename);
+      }
+    }
+  }, [logMessages]);
 
-      eventSource.onmessage = (event) => {
-        try {
-          const logEntry = JSON.parse(event.data) as LogMessage;
-          setLogMessages((prev) => {
-            // Avoid duplicates by checking if message already exists
-            const isDuplicate = prev.some(
-              (l) =>
-                l.timestamp === logEntry.timestamp &&
-                l.message === logEntry.message,
-            );
-            if (isDuplicate) return prev;
-            return [...prev.slice(-500), logEntry];
-          });
-        } catch (err) {
-          console.error("Failed to parse log message:", err);
-        }
-      };
+  useEffect(() => {
+    if (!isReelGenerating && !isContentGenerating) {
+      setTimeout(() => {
+        setGenerationProgress(0);
+        setCurrentJob(undefined);
+      }, 2000);
+    }
+  }, [isReelGenerating, isContentGenerating]);
 
-      eventSource.onerror = () => {
-        eventSource?.close();
-        // Attempt to reconnect after 5 seconds
-        reconnectTimeout = setTimeout(connectToLogStream, 5000);
-      };
-    };
-
-    // Start connection after a short delay to let the server start
-    const initialTimeout = setTimeout(connectToLogStream, 1000);
-
-    return () => {
-      clearTimeout(initialTimeout);
-      if (reconnectTimeout) clearTimeout(reconnectTimeout);
-      eventSource?.close();
-    };
-  }, []);
+  // SSE Logs are now handled by useLogStream hook
 
   const isConfigValid = useMemo(
     () =>
@@ -971,6 +846,8 @@ export default function Page() {
           selected_prompt_path: promptPath,
           query,
           file_name: sanitizedFileName,
+          llm_provider: llmProvider,
+          language,
         };
 
         const result = await postData("/api/generate-content", payload);
@@ -993,6 +870,7 @@ export default function Page() {
       promptPath,
       query,
       fileName,
+      llmProvider,
       log,
       isConfigValid,
       refreshLists,
@@ -1111,47 +989,61 @@ export default function Page() {
   };
 
   const handleDeleteScript = async (filename: string) => {
-    if (!confirm(`Delete script "${filename}"? This cannot be undone.`)) return;
-
-    log(`Deleting script: ${filename}...`, "info");
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/delete-script/${filename}`,
-        { method: "DELETE" },
-      );
-      const result = await response.json();
-      if (response.ok) {
-        log(result.message, "success");
-        setSessionCount(result.session_count ?? sessionCount);
-        refreshLists();
-      } else {
-        throw new Error(result.detail || "Delete failed");
-      }
-    } catch (err: any) {
-      log(`Failed to delete script: ${err.message}`, "error");
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: "Delete Script",
+      message: `Are you sure you want to delete script "${filename}"? This cannot be undone.`,
+      isDanger: true,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        log(`Deleting script: ${filename}...`, "info");
+        try {
+          const response = await fetch(
+            `${API_BASE_URL}/api/delete-script/${filename}`,
+            { method: "DELETE" },
+          );
+          const result = await response.json();
+          if (response.ok) {
+            log(result.message, "success");
+            setSessionCount(result.session_count ?? sessionCount);
+            refreshLists();
+          } else {
+            throw new Error(result.detail || "Delete failed");
+          }
+        } catch (err: any) {
+          log(`Failed to delete script: ${err.message}`, "error");
+        }
+      },
+    });
   };
 
   const handleDeleteReel = async (filename: string) => {
-    if (!confirm(`Delete reel "${filename}"? This cannot be undone.`)) return;
-
-    log(`Deleting reel: ${filename}...`, "info");
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/delete-reel/${filename}`,
-        { method: "DELETE" },
-      );
-      const result = await response.json();
-      if (response.ok) {
-        log(result.message, "success");
-        refreshLists();
-      } else {
-        throw new Error(result.detail || "Delete failed");
-      }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      log(`Failed to delete reel: ${message}`, "error");
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: "Delete Reel",
+      message: `Are you sure you want to delete reel "${filename}"? This cannot be undone.`,
+      isDanger: true,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        log(`Deleting reel: ${filename}...`, "info");
+        try {
+          const response = await fetch(
+            `${API_BASE_URL}/api/delete-reel/${filename}`,
+            { method: "DELETE" },
+          );
+          const result = await response.json();
+          if (response.ok) {
+            log(result.message, "success");
+            refreshLists();
+          } else {
+            throw new Error(result.detail || "Delete failed");
+          }
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          log(`Failed to delete reel: ${message}`, "error");
+        }
+      },
+    });
   };
 
   const handleSaveDialogue = async () => {
@@ -1176,7 +1068,6 @@ export default function Page() {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       log(`Failed to save dialogue: ${message}`, "error");
-      alert(`Failed to save: ${message}`);
     } finally {
       setIsDialogueSaving(false);
     }
@@ -1285,6 +1176,8 @@ export default function Page() {
         setActiveTab={setActiveTab}
         isLogVisible={isLogVisible}
         toggleLog={() => setIsLogVisible(!isLogVisible)}
+        generationProgress={generationProgress}
+        currentJob={currentJob}
       />
 
       {/* Mobile Layout - Tab Content */}
@@ -1304,7 +1197,9 @@ export default function Page() {
         {activeTab === "feed" && (
           <div className="animate-fade-in h-[calc(100vh-180px)] flex flex-col">
             <div className="flex justify-between items-center mb-2 px-1">
-              <h2 className="text-xs font-black uppercase text-muted-foreground tracking-widest">Inspiration Feed</h2>
+              <h2 className="text-xs font-black uppercase text-muted-foreground tracking-widest">
+                Inspiration Feed
+              </h2>
               <button
                 onClick={() => setIsEditChannelsModalOpen(true)}
                 className="text-[10px] font-bold text-primary hover:underline"
@@ -1333,8 +1228,12 @@ export default function Page() {
               setCharB={setCharB}
               audioMode={audioMode}
               setAudioMode={setAudioMode}
+              llmProvider={llmProvider}
+              setLlmProvider={setLlmProvider}
               promptPath={promptPath}
               setPromptPath={setPromptPath}
+              language={language}
+              setLanguage={setLanguage}
               query={query}
               handleQueryChange={handleQueryChange}
               fileName={fileName}
@@ -1413,7 +1312,9 @@ export default function Page() {
               ) : activeTab === "feed" ? (
                 <div className="h-full flex flex-col animate-fade-in">
                   <div className="flex justify-between items-center mb-3">
-                    <h2 className="text-sm font-black uppercase text-muted-foreground tracking-widest">Inspiration Feed</h2>
+                    <h2 className="text-sm font-black uppercase text-muted-foreground tracking-widest">
+                      Inspiration Feed
+                    </h2>
                     <button
                       onClick={() => setIsEditChannelsModalOpen(true)}
                       className="text-xs font-bold text-primary hover:underline"
@@ -1442,8 +1343,12 @@ export default function Page() {
                   setCharB={setCharB}
                   audioMode={audioMode}
                   setAudioMode={setAudioMode}
+                  llmProvider={llmProvider}
+                  setLlmProvider={setLlmProvider}
                   promptPath={promptPath}
                   setPromptPath={setPromptPath}
+                  language={language}
+                  setLanguage={setLanguage}
                   query={query}
                   handleQueryChange={handleQueryChange}
                   fileName={fileName}
@@ -1540,6 +1445,15 @@ export default function Page() {
         isOpen={isEditChannelsModalOpen}
         onClose={() => setIsEditChannelsModalOpen(false)}
         log={log}
+      />
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+        isDanger={confirmModal.isDanger}
+        confirmText="Delete"
       />
     </div>
   );

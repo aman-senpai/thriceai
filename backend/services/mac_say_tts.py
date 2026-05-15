@@ -63,7 +63,7 @@ def generate_audio(text: str, voice_name: str, output_path: str, turn_index: int
         text
     ]
 
-    print(f"  > MAC_SAY TTS: Executing command for turn {turn_index}: {' '.join(command[:4])} ...")
+    # print(f"  > MAC_SAY TTS: Executing command for turn {turn_index}: {' '.join(command[:4])} ...")
 
     # 2. Execute the command
     try:

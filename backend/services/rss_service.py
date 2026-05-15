@@ -2,12 +2,16 @@ import feedparser
 import requests
 import os
 import json
+import time
 from typing import List, Dict, Any
 
 class RSSService:
     def __init__(self, channels_file: str):
         self.channels_file = channels_file
         self.base_url = "https://www.youtube.com/feeds/videos.xml?channel_id="
+        from backend.config import DATA_DIR
+        self.cache_file = os.path.join(DATA_DIR, "rss_cache.json")
+        self.cache_ttl = 3600  # 1 hour
         
     def _load_channels(self) -> List[Dict[str, str]]:
         if not os.path.exists(self.channels_file):
@@ -15,7 +19,18 @@ class RSSService:
         with open(self.channels_file, 'r') as f:
             return json.load(f)
 
-    def fetch_all_videos(self) -> List[Dict[str, Any]]:
+    def fetch_all_videos(self, force_refresh: bool = False) -> List[Dict[str, Any]]:
+        # Check cache
+        if not force_refresh and os.path.exists(self.cache_file):
+            try:
+                with open(self.cache_file, 'r') as f:
+                    cache_data = json.load(f)
+                    if time.time() - cache_data.get('timestamp', 0) < self.cache_ttl:
+                        print("Serving RSS videos from cache")
+                        return cache_data.get('videos', [])
+            except Exception as e:
+                print(f"Cache read error: {e}")
+
         channels = self._load_channels()
         all_videos = []
         
@@ -32,6 +47,17 @@ class RSSService:
                 
         # Sort by published date
         all_videos.sort(key=lambda x: x.get('published', ''), reverse=True)
+        
+        # Update cache
+        try:
+            with open(self.cache_file, 'w') as f:
+                json.dump({
+                    "timestamp": time.time(),
+                    "videos": all_videos
+                }, f, indent=4)
+        except Exception as e:
+            print(f"Cache write error: {e}")
+
         return all_videos
 
     def fetch_channel_videos(self, channel_id: str, channel_name: str, domain: str) -> List[Dict[str, Any]]:

@@ -393,7 +393,7 @@ export const BatchGenerator: React.FC<BatchGeneratorProps> = ({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="absolute top-3 right-3 h-8 w-8 rounded-xl bg-destructive/10 text-destructive hover:bg-destructive hover:text-white opacity-0 group-hover:opacity-100 transition-all z-10"
+                    className="absolute top-3 right-3 h-8 w-8 rounded-xl bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground opacity-0 group-hover:opacity-100 transition-all z-10"
                     onClick={() => removeJob(job.id)}
                   >
                     <Trash2 className="h-3.5 w-3.5" />

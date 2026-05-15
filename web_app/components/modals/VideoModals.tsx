@@ -116,7 +116,7 @@ const VideoModals: React.FC<VideoModalsProps> = ({
             <Button
               onClick={handleSaveDialogue}
               disabled={isDialogueSaving}
-              className="bg-success hover:bg-success/90 text-white font-bold shadow-sm"
+              className="bg-success hover:bg-success/90 text-success-foreground font-bold shadow-sm"
             >
               {isDialogueSaving ? (
                 <>

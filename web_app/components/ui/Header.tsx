@@ -1,4 +1,25 @@
 import React from "react";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import {
+  Clapperboard,
+  Terminal,
+  Sun,
+  Moon,
+  RefreshCw,
+  Feather,
+  Rss,
+  Folder,
+  Wand2,
+} from "lucide-react";
 
 interface HeaderProps {
   refreshLists: () => void;
@@ -35,7 +56,7 @@ export const Header = ({
     <div className="flex justify-between items-center max-w-[1920px] mx-auto">
       <div className="flex items-center gap-3">
         <div className="w-8 h-8 md:w-10 md:h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
-          <i className="fas fa-layer-group text-primary-foreground text-sm md:text-base"></i>
+          <Clapperboard className="text-primary-foreground h-4 w-4 md:h-5 md:w-5" />
         </div>
         <div>
           <h1 className="text-lg md:text-xl font-black tracking-tight text-foreground leading-none">
@@ -48,124 +69,175 @@ export const Header = ({
       </div>
       <div className="flex items-center gap-2">
         {/* Desktop Tab Navigation */}
-        <div className="hidden md:flex bg-muted p-1 rounded-xl mr-4">
-          <button
-            onClick={() => setActiveTab("studio")}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              activeTab === "studio"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+        <div className="hidden md:block mr-4">
+          <Tabs
+            value={activeTab}
+            onValueChange={(v) => setActiveTab(v)}
+            className="bg-muted p-1 rounded-xl"
           >
-            Studio
-          </button>
-          <button
-            onClick={() => setActiveTab("feed")}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              activeTab === "feed"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Feed
-          </button>
-          <button
-            onClick={() => setActiveTab("batch")}
-            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              activeTab === "batch"
-                ? "bg-emerald-600 text-white shadow-sm"
-                : "text-muted-foreground hover:text-emerald-600"
-            }`}
-          >
-            Batch
-          </button>
+            <TabsList className="bg-transparent p-0 gap-0">
+              <TabsTrigger
+                value="studio"
+                className={cn(
+                  "px-4 py-1.5 rounded-lg text-xs font-bold transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
+                  "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Studio
+              </TabsTrigger>
+              <TabsTrigger
+                value="feed"
+                className={cn(
+                  "px-4 py-1.5 rounded-lg text-xs font-bold transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
+                  "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Feed
+              </TabsTrigger>
+              <TabsTrigger
+                value="batch"
+                className={cn(
+                  "px-4 py-1.5 rounded-lg text-xs font-bold transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm",
+                  "text-muted-foreground hover:text-primary",
+                )}
+              >
+                Batch
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
 
-        <button
-          onClick={() => setActiveTab("log")}
-          className="w-9 h-9 md:w-10 md:h-10 flex md:hidden items-center justify-center rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all active:scale-95"
-          title="Terminal"
-        >
-          <i className="fas fa-terminal text-sm md:text-base"></i>
-        </button>
-        <button
-          onClick={toggleLog}
-          className={`hidden md:flex w-9 h-9 md:w-10 md:h-10 items-center justify-center rounded-xl transition-all active:scale-95 ${
-            isLogVisible
-              ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
-              : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-          }`}
-          title="Toggle Terminal"
-        >
-          <i className="fas fa-terminal text-sm md:text-base"></i>
-        </button>
-        <button
-          onClick={toggleTheme}
-          className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all active:scale-95"
-          title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-        >
-          <i
-            className={`fas ${
-              isDark ? "fa-sun text-amber-400" : "fa-moon"
-            } text-sm md:text-base`}
-          ></i>
-        </button>
-        <button
-          onClick={refreshLists}
-          disabled={isReelGenerating || isContentGenerating}
-          className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all active:scale-95 disabled:opacity-50"
-          title="Refresh Lists"
-        >
-          <i
-            className={`fas fa-sync text-sm md:text-base ${
-              isReelsLoading || isContentsLoading ? "animate-spin" : ""
-            }`}
-          ></i>
-        </button>
+        <TooltipProvider delayDuration={300}>
+          {/* Mobile: Terminal button (shows log tab) */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="secondary"
+                size="icon"
+                className="w-9 h-9 md:w-10 md:h-10 flex md:hidden rounded-xl"
+                onClick={() => setActiveTab("log")}
+              >
+                <Terminal className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Terminal</TooltipContent>
+          </Tooltip>
+
+          {/* Desktop: Toggle log panel */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="secondary"
+                size="icon"
+                className={cn(
+                  "w-9 h-9 md:w-10 md:h-10 hidden md:flex rounded-xl transition-all",
+                  isLogVisible &&
+                    "bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:bg-primary/90",
+                )}
+                onClick={toggleLog}
+              >
+                <Terminal className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Toggle Terminal</TooltipContent>
+          </Tooltip>
+
+          {/* Theme toggle */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="secondary"
+                size="icon"
+                className="w-9 h-9 md:w-10 md:h-10 rounded-xl"
+                onClick={toggleTheme}
+              >
+                {isDark ? (
+                  <Sun className="h-4 w-4 text-warning" />
+                ) : (
+                  <Moon className="h-4 w-4" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            </TooltipContent>
+          </Tooltip>
+
+          {/* Refresh */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="secondary"
+                size="icon"
+                className="w-9 h-9 md:w-10 md:h-10 rounded-xl"
+                onClick={refreshLists}
+                disabled={isReelGenerating || isContentGenerating}
+              >
+                <RefreshCw
+                  className={cn(
+                    "h-4 w-4",
+                    (isReelsLoading || isContentsLoading) && "animate-spin",
+                  )}
+                />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Refresh Lists</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
     </div>
+
     {/* Mobile Tab Navigation */}
     <nav className="flex gap-1 mt-3 md:hidden">
       {[
-        { id: "studio", label: "Studio", icon: "fa-feather" },
-        { id: "feed", label: "Feed", icon: "fa-rss" },
-        { id: "files", label: "Files", icon: "fa-folder" },
-        { id: "log", label: "Log", icon: "fa-terminal" },
-      ].map((tab) => (
-        <button
-          key={tab.id}
-          onClick={() => setActiveTab(tab.id)}
-          className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-            activeTab === tab.id
-              ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
-              : "bg-muted text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <i className={`fas ${tab.icon}`}></i>
-          {tab.label}
-        </button>
-      ))}
-      <button
+        { id: "studio", label: "Studio", icon: Feather },
+        { id: "feed", label: "Feed", icon: Rss },
+        { id: "files", label: "Files", icon: Folder },
+        { id: "log", label: "Log", icon: Terminal },
+      ].map((tab) => {
+        const Icon = tab.icon;
+        return (
+          <Button
+            key={tab.id}
+            variant={activeTab === tab.id ? "default" : "ghost"}
+            size="sm"
+            className={cn(
+              "flex-1 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5",
+              activeTab === tab.id && "shadow-md shadow-primary/20",
+            )}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {tab.label}
+          </Button>
+        );
+      })}
+      <Button
+        variant={activeTab === "batch" ? "default" : "ghost"}
+        size="sm"
+        className={cn(
+          "flex-1 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5",
+          activeTab === "batch" &&
+            "bg-primary hover:bg-primary/90 shadow-md shadow-primary/20",
+        )}
         onClick={() => setActiveTab("batch")}
-        className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-          activeTab === "batch"
-            ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
-            : "bg-muted text-muted-foreground hover:text-foreground"
-        }`}
       >
-        <i className="fas fa-magic"></i>
+        <Wand2 className="h-3.5 w-3.5" />
         Batch
-      </button>
+      </Button>
     </nav>
+
     {(isReelGenerating || isContentGenerating) && (
       <div className="absolute bottom-0 left-0 w-full h-1 bg-muted overflow-hidden">
-        <div 
-          className="h-full bg-primary transition-all duration-500 ease-out shadow-[0_0_8px_rgba(var(--primary),0.5)]"
-          style={{ width: `${generationProgress}%` }}
+        <Progress
+          value={generationProgress}
+          className="h-full bg-muted rounded-none [&>div]:bg-primary [&>div]:shadow-[0_0_8px_rgba(var(--primary),0.5)]"
         />
         {currentJob && (
           <div className="absolute top-[-20px] right-4 bg-background/90 backdrop-blur-sm border border-border px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter text-primary animate-pulse">
-            {currentJob} • {generationProgress}%
+            {currentJob}
+            {" • "}
+            {generationProgress}%
           </div>
         )}
       </div>

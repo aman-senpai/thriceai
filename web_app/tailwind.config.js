@@ -2,11 +2,11 @@
 module.exports = {
   darkMode: "class",
   content: [
-    './pages/**/*.{ts,tsx}',
-    './components/**/*.{ts,tsx}',
-    './app/**/*.{ts,tsx}',
-    './src/**/*.{ts,tsx}',
-    './lib/**/*.{ts,tsx}',
+    "./pages/**/*.{ts,tsx}",
+    "./components/**/*.{ts,tsx}",
+    "./app/**/*.{ts,tsx}",
+    "./src/**/*.{ts,tsx}",
+    "./lib/**/*.{ts,tsx}",
   ],
   theme: {
     container: {
@@ -18,7 +18,18 @@ module.exports = {
     },
     extend: {
       fontFamily: {
-        sans: ["var(--font-outfit)", "ui-sans-serif", "system-ui", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "Helvetica Neue", "Arial", "sans-serif"],
+        sans: [
+          "var(--font-outfit)",
+          "ui-sans-serif",
+          "system-ui",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "Segoe UI",
+          "Roboto",
+          "Helvetica Neue",
+          "Arial",
+          "sans-serif",
+        ],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -54,11 +65,25 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        none: "0",
+        sm: "2px",
+        DEFAULT: "4px",
+        md: "4px",
+        lg: "6px",
+        xl: "8px",
+        "2xl": "10px",
+        "3xl": "12px",
+        full: "9999px",
       },
       keyframes: {
         "accordion-down": {
@@ -82,4 +107,4 @@ module.exports = {
     },
   },
   plugins: [require("tailwindcss-animate")],
-}
+};

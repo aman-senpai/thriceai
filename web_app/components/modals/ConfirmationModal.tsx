@@ -1,6 +1,16 @@
 "use client";
 
 import React from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { Trash2, AlertTriangle } from "lucide-react";
 
 interface ConfirmationModalProps {
   isOpen: boolean;
@@ -23,48 +33,48 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   cancelText = "Cancel",
   isDanger = false,
 }) => {
-  // Shared styled classes from VideoModals.tsx
-  const overlayClasses = "fixed inset-0 bg-background/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 transition-opacity duration-300";
-  const modalBase = "bg-card text-card-foreground p-6 rounded-2xl shadow-2xl relative transform transition-all duration-300 border border-border max-w-sm w-full";
-
-  if (!isOpen) return null;
-
   return (
-    <div className={overlayClasses}>
-      <div className={`${modalBase} ${isOpen ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}>
-        <div className="flex flex-col space-y-4">
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isDanger ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : 'bg-primary/10 text-primary'}`}>
-              <i className={`fas ${isDanger ? 'fa-trash-alt' : 'fa-exclamation-triangle'}`}></i>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onCancel()}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <div className="flex items-center gap-3 pb-2">
+            <div
+              className={cn(
+                "w-10 h-10 rounded-full flex items-center justify-center shrink-0",
+                isDanger
+                  ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+                  : "bg-primary/10 text-primary",
+              )}
+            >
+              {isDanger ? (
+                <Trash2 className="h-5 w-5" />
+              ) : (
+                <AlertTriangle className="h-5 w-5" />
+              )}
             </div>
-            <h3 className="text-lg font-bold text-foreground leading-tight">{title}</h3>
+            <DialogTitle className="text-lg font-bold leading-tight">
+              {title}
+            </DialogTitle>
           </div>
-          
-          <p className="text-sm text-muted-foreground leading-relaxed">
+          <DialogDescription className="text-sm text-muted-foreground leading-relaxed text-left">
             {message}
-          </p>
-          
-          <div className="flex gap-3 pt-2">
-            <button
-              onClick={onCancel}
-              className="flex-1 px-4 py-2.5 rounded-xl border border-border bg-secondary/50 hover:bg-secondary text-secondary-foreground text-sm font-bold transition-all active:scale-95"
-            >
-              {cancelText}
-            </button>
-            <button
-              onClick={onConfirm}
-              className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all active:scale-95 shadow-lg ${
-                isDanger 
-                  ? "bg-red-600 hover:bg-red-700 shadow-red-500/20" 
-                  : "bg-primary hover:bg-primary/90 shadow-primary/20"
-              }`}
-            >
-              {confirmText}
-            </button>
-          </div>
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex gap-3 pt-2">
+          <Button variant="outline" className="flex-1" onClick={onCancel}>
+            {cancelText}
+          </Button>
+          <Button
+            variant={isDanger ? "destructive" : "default"}
+            className={cn("flex-1", !isDanger && "shadow-lg shadow-primary/20")}
+            onClick={onConfirm}
+          >
+            {confirmText}
+          </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 

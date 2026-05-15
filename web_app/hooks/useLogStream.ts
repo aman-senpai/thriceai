@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { LogType } from "@/app/page";
+import type { LogType } from "@/types";
 
 export interface LogMessage {
   timestamp: string;
